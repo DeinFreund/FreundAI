@@ -12,6 +12,8 @@ import com.springrts.ai.oo.clb.Resource;
 import com.springrts.ai.oo.clb.Unit;
 import com.springrts.ai.oo.clb.UnitDef;
 import com.springrts.ai.oo.clb.WeaponDef;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -26,13 +28,16 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     List<Unit> fighters = new ArrayList();
     List<Unit> radars = new ArrayList();
     List<Unit> units = new ArrayList();
+    List<Unit> buildings = new ArrayList();
     OOAICallback callback;
     public Unit com;
+    int team = 0;
     Unit fac = null;
-    UnitDef solar, mex, wind, cloaky, rector, glaive, rocko, warrior,radar;
+    UnitDef solar, mex, wind, cloaky, rector, glaive, rocko, warrior, radar, nano, defender;
     List<AIFloat3> availablemetalspots = new ArrayList();
     ThreatHandler threats = new ThreatHandler(this);
     int frame = 0;
+    int nextRadar = 0, nextNano = 0;
 
     public void checkForMetal() {
         Resource metal = callback.getResources().get(0);
@@ -54,7 +59,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
 
             threats.addPoint(unit.getPos(), damage);
         } else {
-            if (attacker.getAllyTeam() == com.getAllyTeam()) {
+            if (attacker.getAllyTeam() == team) {
                 debug("damage added friend");
             }
             threats.addUnit(attacker, damage);
@@ -64,7 +69,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     }
 
     public int enemyEnterLOS(Unit enemy) {
-        if (enemy.getAllyTeam() == com.getAllyTeam()) {
+        if (enemy.getAllyTeam() == team) {
             debug("enterlos added friend");
         }
         threats.addUnit(enemy, enemy.getHealth());
@@ -78,7 +83,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     }
 
     public int enemyEnterRadar(Unit enemy) {
-        if (enemy.getAllyTeam() == com.getAllyTeam()) {
+        if (enemy.getAllyTeam() == team) {
             debug("enter radar added friend");
         }
         threats.addUnit(enemy, enemy.getHealth());
@@ -87,7 +92,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
 
     public int enemyLeaveRadar(Unit enemy) {
         threats.removeUnit(enemy);
-        debug(enemy.getDef().getHumanName() + " left radar");
+        //debug(enemy.getDef().getHumanName() + " left radar");
         return 0;
     }
 
@@ -154,9 +159,19 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                 debug("found solar");
 
             }
+            if (def.getName().equals("corrl")) {
+                defender = def;
+                debug("found defender");
+
+            }
             if (def.getName().equals("cormex")) {
                 mex = def;
                 debug("found mex");
+
+            }
+            if (def.getName().equals("armnanotc")) {
+                nano = def;
+                debug("found nano");
 
             }
         }
@@ -172,14 +187,14 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
         return (float) (Math.pow(a.x - b.x, 2) + Math.pow(a.z - b.z, 2)); //+ Math.pow(a.y - b.y, 2)
     }
 
-    public Unit closestUnitToRepair(AIFloat3 pos) {
+    public Unit closestUnitToRepair(Unit unit) {
         debug("getting closest unit to repair");
         float mindis = Float.MAX_VALUE;
         Unit res = null;
         for (Unit u : units) {
-            if (((u.isBeingBuilt() && callback.getEconomy().getCurrent(callback.getResources().get(1)) > 100) || 
-                    u.getHealth() < u.getMaxHealth()) && dist(pos, u.getPos()) < mindis) {
-                mindis = dist(pos, u.getPos());
+            if (((u.isBeingBuilt() && !u.getDef().equals(glaive) && !u.getDef().equals(rocko) && !u.getDef().equals(rector))
+                    || (!u.isBeingBuilt() && u.getHealth() < u.getMaxHealth())) && dist(unit.getPos(), u.getPos()) < mindis && !u.equals(unit)) {
+                mindis = dist(unit.getPos(), u.getPos());
                 res = u;
             }
         }
@@ -201,7 +216,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             debug("Exception during closestRadar: " + ex);
         }
         //debug("closest unit is: " + res.getDef().getHumanName() + " at a distance of " + mindis + " - "
-         //       + pos.x + "|" + pos.z + " -> " + res.getPos().x + "|" + res.getPos().z);
+        //       + pos.x + "|" + pos.z + " -> " + res.getPos().x + "|" + res.getPos().z);
         return res;
     }
 
@@ -209,10 +224,11 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
         float mindis = Float.MAX_VALUE;
         Unit res = null;
         try {
-            debug("looking for mex");
+            //debug("looking for mex");
+
             for (Unit u : units) {
                 if (u.getDef().getName().equals("cormex")) {
-                    debug("units contains mex");
+                    //   debug("units contains mex");
                 }
                 if (dist(pos, u.getPos()) < mindis) {
                     mindis = dist(pos, u.getPos());
@@ -223,8 +239,31 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
         } catch (Exception ex) {
             debug("Exception during closestUnit: " + ex);
         }
-        debug("closest unit is: " + res.getDef().getHumanName() + " at a distance of " + mindis + " - "
-                + pos.x + "|" + pos.z + " -> " + res.getPos().x + "|" + res.getPos().z);
+        //debug("closest unit is: " + res.getDef().getHumanName() + " at a distance of " + mindis + " - "
+        //       + pos.x + "|" + pos.z + " -> " + res.getPos().x + "|" + res.getPos().z);
+        return res;
+    }
+    public Unit closestBuilder(AIFloat3 pos) {
+        float mindis = Float.MAX_VALUE;
+        Unit res = null;
+        try {
+            //debug("looking for mex");
+
+            for (Unit u : builders) {
+                if (u.getDef().getName().equals("cormex")) {
+                    //   debug("units contains mex");
+                }
+                if (dist(pos, u.getPos()) < mindis) {
+                    mindis = dist(pos, u.getPos());
+                    res = u;
+
+                }
+            }
+        } catch (Exception ex) {
+            debug("Exception during closestUnit: " + ex);
+        }
+        //debug("closest unit is: " + res.getDef().getHumanName() + " at a distance of " + mindis + " - "
+        //       + pos.x + "|" + pos.z + " -> " + res.getPos().x + "|" + res.getPos().z);
         return res;
     }
 
@@ -263,54 +302,112 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
         return closestspot;
 
     }
-
+    
+    int nextBuildOrder = 0;
+    
+    @Override
+    public int unitMoveFailed(Unit unit) {
+        return unitIdle(unit);
+    }
     @Override
     public int unitIdle(Unit unit) {
-
-        debug("i1");
-        if (builders.contains(unit)) {
-            if (fac == null) {
-                if (unit.equals(com)) {
-                    debug("plopping fac");
-                    com.build(cloaky, callback.getMap().findClosestBuildSite(cloaky, com.getPos(), 400f, 0, 0), 0, (short) 0, Integer.MAX_VALUE);
-                }
-            } else {
-                debug("i2");
-                if (closestRadar(unit.getPos()) == null ||dist(closestRadar(unit.getPos()).getPos(),unit.getPos()) > 2000*2000){
-                    debug("building radar");
-                    unit.build(radar, callback.getMap().findClosestBuildSite(radar, unit.getPos(), 400f, 3, 0), 0, (short) 0, Integer.MAX_VALUE);
-                }
-                else if ((callback.getEconomy().getCurrent(callback.getResources().get(0)) > 200 || rnd.nextBoolean())
-                        && closestUnitToRepair(unit.getPos()) != null) { //metal excess
-
-                    debug("i2b");
-                    unit.repair(closestUnitToRepair(unit.getPos()), (short) 0, Integer.MAX_VALUE);
-
-                } else if (callback.getEconomy().getCurrent(callback.getResources().get(1)) < 320) {
-
-                    debug("i2a");
-                    unit.build(solar, callback.getMap().findClosestBuildSite(solar, unit.getPos(), 400f, 3, 0), 0, (short) 0, Integer.MAX_VALUE);
-                    callback.getGame().sendTextMessage(unit.getDef().getHumanName() + " building solar", 0);
-                    //unit.build(mex, closestMetalSpot(unit.getPos()),0, (short) 0, Integer.MAX_VALUE);
+        try {
+            //debug("i1");
+            if (!unit.getCurrentCommands().isEmpty()) return 0;
+            if (builders.contains(unit) && frame > nextBuildOrder) {
+                nextBuildOrder = frame + 30;
+                if (fac == null) {
+                    if (unit.equals(com)) {
+                        debug("plopping fac");
+                        com.build(cloaky, callback.getMap().findClosestBuildSite(cloaky, com.getPos(), 600f, 0, 0), 0, (short) 0, Integer.MAX_VALUE);
+                    }
                 } else {
-                    debug("i2c");
-                    debug("building mex at " + closestMetalSpot(unit.getPos()).x + "|" + closestMetalSpot(unit.getPos()).z);
+                    debug("i2");
+                    if ((closestRadar(unit.getPos()) == null || dist(closestRadar(unit.getPos()).getPos(), unit.getPos()) > 1500 * 1500) && frame > nextRadar) {
+                        debug("building radar");
+                        AIFloat3 pos = callback.getMap().findClosestBuildSite(radar, unit.getPos(), 600f, 3, 0);
+                        unit.build(radar, callback.getMap().findClosestBuildSite(radar, unit.getPos(), 600f, 3, 0), 0, (short) 0, Integer.MAX_VALUE);
+                        callback.getMap().getDrawer().addPoint(unit.getPos(),"building radar(" + pos.x+"|"+pos.z+") " + unit.getCurrentCommands().size());
+                        nextRadar = frame + 200;
+                    } else if (closestUnitToRepair(unit) != null
+                            && dist(unit.getPos(), closestUnitToRepair(unit).getPos()) < 300 * 300 + rnd.nextDouble() * 300 * 300) {
 
-                    unit.build(mex, closestMetalSpot(unit.getPos()), 0, (short) 0, Integer.MAX_VALUE);
+                        //debug("i2b");
+                        unit.repair(closestUnitToRepair(unit), (short) 0, frame + 500);
+                        callback.getMap().getDrawer().addPoint(unit.getPos(),"repairing " + closestUnitToRepair(unit).getDef().getHumanName());
+                    } else if (rnd.nextDouble() > 0.94) {
+                        double maxd = -1;
+                        Unit best = null;
+                        for (Unit b : buildings) {
+                            double r = rnd.nextDouble();
+                            if (threats.getDanger(b.getPos()) + r > maxd) {
+                                best = b;
+                                maxd = threats.getDanger(b.getPos()) + r;
+                            }
+                        }
+                        if (best != null && callback.getMap().findClosestBuildSite(defender, best.getPos(), 600f, 3, 0).x > 0) {
+                            unit.build(defender, callback.getMap().findClosestBuildSite(defender, best.getPos(), 600f, 3, 0), 0, (short) 0, frame + 1000);
+                            callback.getMap().getDrawer().addPoint(unit.getPos(),"building defender");
+                        }
+                    } else if (callback.getEconomy().getCurrent(callback.getResources().get(0)) > 200
+                            && callback.getEconomy().getIncome(callback.getResources().get(0)) > callback.getEconomy().getUsage(callback.getResources().get(0))
+                            && callback.getEconomy().getCurrent(callback.getResources().get(1)) > 350) {
+                        //metal excess + enough energy
+                        boolean helping = false;
+                        for (Unit u : units) {
+                            if (u.getDef().equals(nano) && u.isBeingBuilt()) {
+                                unit.repair(u, (short) 0, Integer.MAX_VALUE);
+                                helping = true;
+                                callback.getMap().getDrawer().addPoint(unit.getPos(),"helping with nano");
+                                break;
+                            }
+                        }
+                        if (!helping && frame > nextNano) {
+                            unit.build(nano, callback.getMap().findClosestBuildSite(nano, fac.getPos(), 600f, 3, 0), 0, (short) 0, frame + 1000);
+                            nextNano = frame + 200;
+                            callback.getMap().getDrawer().addPoint(unit.getPos(),"building nano");
+                        }
+                    } else if (callback.getEconomy().getCurrent(callback.getResources().get(1)) < 250) {
+
+                        //debug("i2a");
+                        unit.build(solar, callback.getMap().findClosestBuildSite(solar, unit.getPos(), 600f, 3, 0), 0, (short) 0, frame + 1000);
+                        callback.getGame().sendTextMessage(unit.getDef().getHumanName() + " building solar", 0);
+                        callback.getMap().getDrawer().addPoint(unit.getPos(),"building solar");
+                        //unit.build(mex, closestMetalSpot(unit.getPos()),0, (short) 0, Integer.MAX_VALUE);
+                    } else {
+                        //debug("i2c");
+                        debug("building mex at " + closestMetalSpot(unit.getPos()).x + "|" + closestMetalSpot(unit.getPos()).z);
+
+                        unit.build(mex, closestMetalSpot(unit.getPos()), 0, (short) 0, Integer.MAX_VALUE);
+                        callback.getMap().getDrawer().addPoint(unit.getPos(),"building mex");
+                    }
+                    //debug("energy: " + callback.getEconomy().getCurrent(callback.getResources().get(1)));
                 }
-                debug("energy: " + callback.getEconomy().getCurrent(callback.getResources().get(1)));
             }
-        }
-        debug("i3");
-        if (fighters.contains(unit)) {
-
-            if (threats.getTarget(unit) != null) {
-                unit.attack(threats.getTarget(unit), (short) 0, frame + 200);
-            } else if (threats.getDanger(unit) != null) {
-                unit.moveTo(threats.getDanger(unit), (short) 0, frame + 1000);
-            } else {
-                unit.moveTo(units.get(rnd.nextInt(units.size())).getPos(), (short) 0, frame + 200);
+            //debug("i3");
+            if (fighters.contains(unit)) {
+                if (closestRadar(unit.getPos()) != null && dist(unit.getPos(), closestRadar(unit.getPos()).getPos()) > 2000 * 2000 || unit.getHealth() < 0.3 * unit.getMaxHealth()) {
+                    if (builders.size() > 0) {
+                        unit.moveTo(builders.get(rnd.nextInt(builders.size())).getPos(), (short) 0, frame + 200);
+                    } else {
+                        unit.moveTo(fac.getPos(), (short) 0, frame + 200);
+                    }
+                } else if (threats.getTarget(unit) != null) {
+                    unit.attack(threats.getTarget(unit), (short) 0, frame + 200);
+                } /*else if (threats.getDanger(unit) != null) {
+                 unit.moveTo(threats.getDanger(unit), (short) 0, frame + 1000);
+                 }*/ else {
+                    unit.moveTo(units.get(rnd.nextInt(units.size())).getPos(), (short) 0, frame + 200);
+                }
             }
+            if (unit.getDef().equals(nano)) {
+                unit.guard(fac, (short) 0, Integer.MAX_VALUE);
+            }
+        } catch (Exception ex) {
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            ex.printStackTrace(pw);
+            callback.getMap().getDrawer().addPoint(unit.getPos(), "exception at unitIdle(" + sw.toString().replace("\n", " ") + ") " + ex);
         }
         return 0;
     }
@@ -323,10 +420,25 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             //debug("update");
             this.frame = frame;
 
-            for (int unitsChecked = 0; unitsChecked < 10; unitsChecked++) {
+            for (int unitsChecked = 0; unitsChecked < 8; unitsChecked++) {
                 Unit u = units.get(rnd.nextInt(units.size()));//check a random unit each frame
+                if (u.getPos().x < 0) {
+                    units.remove(u);
+                    continue;
+                }
+                if (u.getDef().equals(nano)) {
+                    u.guard(fac, (short) 0, Integer.MAX_VALUE);
+                }
+                if (fighters.contains(u) && dist(u.getPos(), closestRadar(u.getPos()).getPos()) > 2000 * 2000 || u.getHealth() < 0.3 * u.getMaxHealth()) {
+                    u.moveTo(closestBuilder(u.getPos()).getPos(), (short) 0, frame + 200);
+                }
+                if (dist(u.getPos(), fac.getPos()) < 30 * 30) {
+                    AIFloat3 f3 = fac.getPos();
+                    f3.z += 200;
+                    u.moveTo(f3, (short) 0, frame + 200);
+                }
                 if (u.getCurrentCommands().isEmpty()) {
-                    debug("1a");
+                    //debug("1a");
                     boolean building = true;
                     for (CommandDescription cmd : u.getSupportedCommands()) {
                         if (cmd.getId() == 10) {
@@ -338,36 +450,32 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                     } else {
 
                         //u.moveTo(u.getPos(), (short) 32, Integer.MAX_VALUE);
-                        debug("2a");
-                        unitIdle(u);
-                        debug("found idling " + u.getDef().getHumanName());
+                        //debug("2a");
+                        if (!u.isActivated())unitIdle(u);
+                        
+                        //debug("found idling " + u.getDef().getHumanName());
                     }
                 } else if (u.getCurrentCommands().get(u.getCurrentCommands().size() - 1).getTimeOut() < frame) {//attack
-                    debug("1b");
-                    debug("timeout " + u.getCurrentCommands().get(u.getCurrentCommands().size() - 1).getTimeOut() + " it is: " + frame);
+                    //debug("1b");
+                    //debug("timeout " + u.getCurrentCommands().get(u.getCurrentCommands().size() - 1).getTimeOut() + " it is: " + frame);
                     if (u.getCurrentCommands().get(u.getCurrentCommands().size() - 1).getTimeOut() < frame) {
-                        debug("timed out");
+                        //debug("timed out");
                         unitIdle(u);
                     }
-                } else if (u.getCurrentCommands().get(u.getCurrentCommands().size() - 1).getId() == 10 && builders.contains(u)) {//move
+                } /*else if (u.getCurrentCommands().get(u.getCurrentCommands().size() - 1).getId() == 10 && builders.contains(u)) {//move
                     debug("stopped constructor");
                     u.stop((short) 0, frame + 20);
-                }
+                }*/
             }
 
-            if (frame % 50 == 0) {
-                debug("2");
-                threats.decay(5f);
+            if (frame % 15 == 0) {
+                //debug("2");
+                threats.decay(1.2f);
                 if (fac != null && fac.getCurrentCommands().isEmpty()) {
-                    if (callback.getEconomy().getCurrent(callback.getResources().get(0)) < 320 || (Math.round(Math.sqrt(builders.size()) / 3 * rnd.nextDouble()) > 0)) {
-                        int r = rnd.nextInt(7);
-                        if (r < 4) {
-                            fac.build(glaive, fac.getPos(), 0, (short) 0, Integer.MAX_VALUE);
-                        } else if (r < 6) {
-                            fac.build(rocko, fac.getPos(), 0, (short) 0, Integer.MAX_VALUE);
-                        } else if (r < 7) {
-                            fac.build(warrior, fac.getPos(), 0, (short) 0, Integer.MAX_VALUE);
-                        }
+                    if (fighters.size() < 10 || (((builders.size())) > 4)) {
+
+                        fac.build(threats.getNeededUnit(), fac.getPos(), 0, (short) 0, Integer.MAX_VALUE);
+
                         debug(callback.getEconomy().getCurrent(callback.getResources().get(0)) + " metal -> fighters");
                     } else {
                         fac.build(rector, fac.getPos(), 0, (short) 0, Integer.MAX_VALUE);
@@ -396,6 +504,12 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             callback.getGame().sendTextMessage("created mex at " + unit.getPos().x + "|" + unit.getPos().z, 0);
             //removeClosestMetalSpot(unit.getPos());
         }
+        if (unit.getDef().equals(radar)) {
+
+            callback.getGame().sendTextMessage("created radar", 0);
+            radars.add(unit);
+            //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
+        }
         return 0;
     }
 
@@ -417,6 +531,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             callback.getGame().sendTextMessage("Found com", 0);
             builders.add(unit);
             unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
+            team = com.getAllyTeam();
             //com.build(cloaky, callback.getMap().findClosestBuildSite(cloaky, com.getPos(), 50f, 0, 0), 0, (short)0, Integer.MAX_VALUE);
         }
         if (unit.getDef().getName().equals("armpw")) {
@@ -431,16 +546,36 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             fighters.add(unit);
             //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
         }
+        if (unit.getDef().equals(solar)) {
+
+            callback.getGame().sendTextMessage("Found solar", 0);
+            buildings.add(unit);
+            //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
+        }
+        if (unit.getDef().equals(mex)) {
+
+            callback.getGame().sendTextMessage("Found mex", 0);
+            buildings.add(unit);
+            //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
+        }
         if (unit.getDef().equals(radar)) {
 
             callback.getGame().sendTextMessage("Found radar", 0);
-            radars.add(unit);
+            if (!radars.contains(unit)) {
+                radars.add(unit);
+            }
             //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
         }
         if (unit.getDef().equals(warrior)) {
 
             callback.getGame().sendTextMessage("Found warrior", 0);
             fighters.add(unit);
+            //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
+        }
+        if (unit.getDef().equals(nano)) {
+
+            callback.getGame().sendTextMessage("Found nano", 0);
+            unit.guard(fac, (short) 0, Integer.MAX_VALUE);
             //unit.moveTo(unit.getPos(), (short) 0, Integer.MAX_VALUE); //forces idle call
         }
         if (unit.getDef().getName().equals("armrectr")) {

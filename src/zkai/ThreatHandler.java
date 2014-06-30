@@ -7,6 +7,7 @@ package zkai;
 
 import com.springrts.ai.oo.AIFloat3;
 import com.springrts.ai.oo.clb.Unit;
+import com.springrts.ai.oo.clb.UnitDef;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -37,11 +38,19 @@ public class ThreatHandler {
     }
 
     public void addUnit(Unit unit, float value) {
-        if (unit.getAllyTeam() == parent.com.getAllyTeam()) {
+        if (value < 0) value = 100;
+        if (unit.getAllyTeam() == parent.team) {
             parent.debug("addded friendly unit as enemy");
             return;
         }
+        if (unit.getDef() != null){
+            
+        if (value > 50)parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "enemy " +unit.getDef().getTooltip()+": " + value);
         parent.debug("adding " + unit.getDef().getHumanName());
+        }else{
+            
+            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "enemy unknown: " + value);
+        }
         for (Enemy e : enemies) {
             if (e.unit.equals(unit)) {
                 e.value += value;
@@ -54,14 +63,15 @@ public class ThreatHandler {
     public void decay(float amount) {
         List<Point> useless = new ArrayList();
         for (Point p : points) {
-            p.value -= amount;
-            if (p.value < 0) {
+        
+            p.value /= amount;
+            if (p.value < 1) {
                 useless.add(p);
             }
         }
         List<Enemy> uselessE = new ArrayList();
         for (Enemy e : enemies) {
-            if (e.unit.getAllyTeam() == parent.com.getAllyTeam()) {
+            if (e.unit.getAllyTeam() == parent.team ||e.unit.getPos().x < 0) {
                 uselessE.add(e);
             }
         }
@@ -70,6 +80,7 @@ public class ThreatHandler {
     }
 
     public void addPoint(AIFloat3 point, float value) {
+        parent.callback.getMap().getDrawer().addPoint(point, "danger: " + value);
         points.add(new Point(point, value));
     }
 
@@ -79,12 +90,14 @@ public class ThreatHandler {
         Enemy target = null;
         for (Enemy e : enemies) {
             float r = (float)rnd.nextDouble()/2f + 0.5f;
-            if (r*e.value / zkai.dist(warrior.getPos(), e.unit.getPos()) > maxv) {
-                maxv = r*e.value / zkai.dist(warrior.getPos(), e.unit.getPos());
+            int mult = 1;
+            if (isRaidable(e.unit) ^ isRaidable(warrior)) mult *= 100;
+            if (1f/(r*e.value *mult)/ zkai.dist(warrior.getPos(), e.unit.getPos()) > maxv) {
+                maxv = 1f/(r*e.value *mult)/ zkai.dist(warrior.getPos(), e.unit.getPos());
                 target = e;
             }
         }
-        if (target == null) return null;
+        if (target == null || target.unit.getAllyTeam()==parent.team) return null;
         return target.unit;
     }
     public AIFloat3 getDanger(Unit warrior) {
@@ -93,8 +106,8 @@ public class ThreatHandler {
         Point target = null;
         for (Point p : points) {
             float r = (float)rnd.nextDouble()/2f + 0.5f;
-            if ( r*p.value / zkai.dist(warrior.getPos(), p.point) > maxv) {
-                maxv =r* p.value / zkai.dist(warrior.getPos(), p.point);
+            if ( 1f/(r*p.value) / zkai.dist(warrior.getPos(), p.point) > maxv) {
+                maxv =1f/(r* p.value) / zkai.dist(warrior.getPos(), p.point);
                 target = p;
             }
         }
@@ -102,7 +115,35 @@ public class ThreatHandler {
         return target.point;
     }
 
-
+    private boolean isRaidable(Unit unit){
+        if (unit.getDef() == null) return true;
+        return unit.getDef().getTooltip().contains("Skirmisher") || unit.getDef().getTooltip().contains("Attack") ||
+                unit.getDef().getTooltip().contains("Raider")|| unit.getDef().getTooltip().contains("Fast")|| unit.getDef().getTooltip().contains("Blockade");
+    }
+    
+    public UnitDef getNeededUnit(){
+        int glaive =1;
+        int rocko = 1;
+        for (Enemy e : enemies){
+            if (isRaidable(e.unit) ){
+                glaive ++;
+            }else{
+                rocko++;
+            }
+        }
+        int owng=1, ownr=1;
+        for (Unit u : parent.fighters){
+            if (u.getDef().equals(parent.glaive)){
+                owng++;
+            }else{
+                ownr++;
+            }
+        }
+        if (glaive/(float)rocko > owng /(float)ownr){
+            return parent.glaive;
+        }
+        return parent.rocko;
+    }
 
     public float getDanger(AIFloat3 point) {
         float total = 0;

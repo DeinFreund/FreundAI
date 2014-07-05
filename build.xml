@@ -10,6 +10,11 @@
 <project name="springAI" default="default" basedir=".">
     <description>Builds, tests, and runs the project springAI.</description>
     <import file="nbproject/build-impl.xml"/>
+	<target name="-post-jar">   
+		<exec dir="." executable="cmd">
+			  <arg line="/c copy.bat"/>
+		</exec>
+	</target>
     <!--
 
     There exist several targets which are by default empty and which can be 

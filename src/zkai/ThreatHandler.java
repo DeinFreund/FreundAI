@@ -36,6 +36,8 @@ public class ThreatHandler {
             }
         }
     }
+    
+    
 
     public void addUnit(Unit unit, float value) {
         if (value < 0) value = 100;
@@ -71,7 +73,7 @@ public class ThreatHandler {
         }
         List<Enemy> uselessE = new ArrayList();
         for (Enemy e : enemies) {
-            if (e.unit.getAllyTeam() == parent.team ||e.unit.getPos().x < 0) {
+            if (e.unit.getAllyTeam() == parent.team ||e.unit.getPos().x < 0 || !parent.callback.getEnemyUnitsInRadarAndLos().contains(e.unit)) {
                 uselessE.add(e);
             }
         }

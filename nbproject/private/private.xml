@@ -4,7 +4,10 @@
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
             <file>file:/C:/Users/User/Documents/NetBeansProjects/springAI/src/zkai/zkai.java</file>
+            <file>file:/C:/Users/User/Documents/NetBeansProjects/springAI/src/zkai/ExpansionHandler.java</file>
             <file>file:/C:/Users/User/Documents/NetBeansProjects/springAI/src/zkai/ThreatHandler.java</file>
+            <file>file:/C:/Users/User/Documents/NetBeansProjects/springAI/src/zkai/DefenseMap.java</file>
+            <file>file:/C:/Users/User/Documents/NetBeansProjects/springAI/src/zkai/BuilderHandler.java</file>
         </group>
     </open-files>
 </project-private>

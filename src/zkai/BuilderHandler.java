@@ -12,6 +12,7 @@ import com.springrts.ai.oo.clb.UnitDef;
 import java.util.ArrayList;
 import java.util.TreeMap;
 import java.util.List;
+import zkai.Area.Owner;
 
 /**
  *
@@ -36,6 +37,7 @@ public class BuilderHandler {
     List<Node> grid;
 
     float energyUnderConstruction = 0;
+    float reserveEnergy = 2;
     static Resource metal, energy;
 
     TreeMap<Integer, Float> pylonrange;
@@ -55,7 +57,6 @@ public class BuilderHandler {
         energy = parent.callback.getResources().get(1);
         grid = new ArrayList();
         virtualRadars = new ArrayList();
-        
 
         //init hardcoded pylonranges
         pylonrange = new TreeMap();
@@ -77,10 +78,12 @@ public class BuilderHandler {
     }
 
     public void unitKilled(Unit u) {
-        if (Math.random() < 0.15){
+        if (Math.random() < 0.15) {
             //pending.add(new Build(u.getPos(),parent.defender,-1,lastOrderId++));
         }
-        if (Math.random() < 0.6 )pending.add(new Fight(u.getPos(),-1,lastOrderId++));
+        if (Math.random() < 0.6) {
+            pending.add(new Fight(u.getPos(), -1, lastOrderId++));
+        }
         for (Builder b : builders) {
             if (b.unit.getUnitId() == u.getUnitId()) {
                 b.update(parent.frame);
@@ -88,31 +91,37 @@ public class BuilderHandler {
                     pending.add(b.order);
                 }
                 builders.remove(b);
-                return;
+                break;
             }
         }
         for (Unit m : mexes) {
             if (m.getUnitId() == u.getUnitId()) {
                 mexes.remove(m);
-                return;
+                break;
             }
         }
         for (Node m : grid) {
             if (m.unit != null && m.unit.getUnitId() == u.getUnitId()) {
                 grid.remove(m);
-                return;
+                break;
             }
         }
         for (Node m : virtualRadars) {
             if (m.unit != null && m.unit.getUnitId() == u.getUnitId()) {
                 grid.remove(m);
-                return;
+                break;
             }
         }
         for (Unit m : buildings) {
             if (m.getUnitId() == u.getUnitId()) {
                 buildings.remove(m);
-                return;
+                break;
+            }
+        }
+        for (Unit m : factories) {
+            if (m.getUnitId() == u.getUnitId()) {
+                factories.remove(m);
+                break;
             }
         }
     }
@@ -185,7 +194,7 @@ public class BuilderHandler {
         if (u.getDef().getName().contains("factory")) {
             buildings.add(u);
         }
-        
+
     }
 
     //HERE STARTS CODE FROM BENJAMIN
@@ -226,199 +235,227 @@ public class BuilderHandler {
             min = Math.min(min, zkai.dist(t, trg));
         }
         // return the minimum
-        if (min == Double.MAX_VALUE) return 0;
+        if (min == Double.MAX_VALUE) {
+            return 0;
+        }
         return min;
     }
     //HERE IT'S OVER
+    int bertha = 0;
 
-    public UnitDef getDefenseTower(AIFloat3 pos){
-        if (parent.defense.getDefense(pos) > 3000)
-            return parent.bertha;
-        if (parent.defense.getDefense(pos) > 300)
+    public UnitDef getDefenseTower(AIFloat3 pos) {
+        if (parent.defense.getDefense(pos) > 3000) {
+            bertha++;
+        }
+        if (parent.defense.getDefense(pos) > 300) {
             return parent.hlt;
-        if (parent.defense.getValue(pos) / parent.defense.maxVal > 0.42 || parent.defense.getDefense(pos) > 200)
+        }
+        if (parent.defense.getValue(pos) / parent.defense.maxVal > 0.42 || parent.defense.getDefense(pos) > 200) {
             return parent.llt;
+        }
         return parent.defender;
     }
-        
-    
-    public boolean inRadarRange(AIFloat3 pos){
-        parent.debug("requesting radar coverage");
-        for (Node n : virtualRadars){
-            if (zkai.dist(n.pos, pos) < n.range * n.range /1.5) return true;
+
+    public boolean inRadarRange(AIFloat3 pos) {
+        //parent.debug("requesting radar coverage");
+        for (Node n : virtualRadars) {
+            if (zkai.dist(n.pos, pos) < n.range * n.range / 2) {
+                return true;
+            }
         }
         return false;
     }
-    
+
     public void update(int frame) {
         for (int j = 0; j < 5 && j < builders.size(); j++) {//active check for timed out builders
             int i = (int) (parent.rnd.nextDouble() * builders.size());
             builders.get(i).update(frame);
         }
-        for (int j = 0; j < 2 && j < idlers.size(); j++) {
-            int i = (int) (parent.rnd.nextDouble() * idlers.size());
-            if (i >= idlers.size()) {
-                parent.debug("Warning: weird idlers stuff");
-                continue;
-            }
-            float maxscore = 0;
-            Order best = null;
-            for (Order o : pending) {
-                float score;
-                score = 5e-7f*(float) Math.sqrt(closestBuilder(idlers.get(i), o.getPosition()));
-                float a,b;
-                a = score;
-                switch (o.id) {
-                    case 40:
-                        //parent.debug("found repair order");
-                        score += 1f /  Math.sqrt(zkai.dist(idlers.get(i).unit.getPos(), ((Repair) o).target.getPos()));
-                        score *= 1.5;
-                        break;
-                    case 16:
-                        //parent.debug("found repair order");
+        /*for (int j = 0; j < 2 && j < idlers.size(); j++) {
+         int i = (int) (parent.rnd.nextDouble() * idlers.size());
+         if (i >= idlers.size()) {
+         parent.debug("Warning: weird idlers stuff");
+         continue;
+         }
+         float maxscore = 0;
+         Order best = null;
+         for (Order o : pending) {
+         float score;
+         score = 5e-7f*(float) Math.sqrt(closestBuilder(idlers.get(i), o.getPosition()));
+         float a,b;
+         a = score;
+         switch (o.id) {
+         case 40:
+         //parent.debug("found repair order");
+         score += 1f /  Math.sqrt(zkai.dist(idlers.get(i).unit.getPos(), ((Repair) o).target.getPos()));
+         score *= 1.5;
+         break;
+         case 16:
+         //parent.debug("found repair order");
                         
-                        score += 1f /  Math.sqrt(zkai.dist(idlers.get(i).unit.getPos(), o.getPosition()));
-                        score *= 1;
-                        if (zkai.dist(idlers.get(i).unit.getPos(), factories.get(0).getPos()) < 500*500) score = 0;
-                        break;
-                    default:
-                        if (o.id >= 0) {
-                            parent.debug("Warning: invalid build order");
-                        }
-                        if (((Build) o).position == null) {
-                            parent.debug("position is null");
-                        }
-                        if (((Build) o).position.x < 0) {
-                            score += 0.001;
-                        } else {
-                            score += Math.min(1f, 1f /  Math.sqrt(zkai.dist(idlers.get(i).unit.getPos(), o.getPosition())));
-                        }
-                        b = score;
-                        if (( ((Build)o).building.equals(parent.solar))) 
-                            if (parent.callback.getEconomy().getCurrent(energy) > 250) score /= 50;
-                            else score*=50;
-                        parent.debug(((Build) o).building.getHumanName() + "(" + o.orderId + "): " + a  + " + " + b +" => "+ score);
-                }
-                if (score > maxscore) {
-                    maxscore = score;
-                    best = o;
-                }
-            }
-            if (best != null) {
-                parent.debug("best is " + best.orderId);
-                boolean done;
-                switch (best.id) {
-                    case 40:
-                        done = idlers.get(i).repair(((Repair) best).target, frame + 400, best.orderId);
-                        break;
-                    case 16:
-                        done = idlers.get(i).fight(best.getPosition(), frame + 700, best.orderId);
-                        break;
-                    default:
-                        float radius = 800;
-                        int space = 6;
-                        if (((Build) best).building.equals(parent.mex)) {
-                            radius = 0;
-                            space = 1;
-                        }
-                        AIFloat3 pos = ((Build) best).position;
-                        if (pos.x < 0) {
-                            pos = idlers.get(i).unit.getPos();
-                        }
-                        done = idlers.get(i).build(pos, ((Build) best).building, radius, space, frame + 500, best.orderId);
+         score += 1f /  Math.sqrt(zkai.dist(idlers.get(i).unit.getPos(), o.getPosition()));
+         score *= 1;
+         if (zkai.dist(idlers.get(i).unit.getPos(), factories.get(0).getPos()) < 500*500) score = 0;
+         break;
+         default:
+         if (o.id >= 0) {
+         parent.debug("Warning: invalid build order");
+         }
+         if (((Build) o).position == null) {
+         parent.debug("position is null");
+         }
+         if (((Build) o).position.x < 0) {
+         score += 0.001;
+         } else {
+         score += Math.min(1f, 1f /  Math.sqrt(zkai.dist(idlers.get(i).unit.getPos(), o.getPosition())));
+         }
+         b = score;
+         if (( ((Build)o).building.equals(parent.solar))) 
+         if (parent.callback.getEconomy().getCurrent(energy) > 250) score /= 50;
+         else score*=50;
+         parent.debug(((Build) o).building.getHumanName() + "(" + o.orderId + "): " + a  + " + " + b +" => "+ score);
+         }
+         if (score > maxscore) {
+         maxscore = score;
+         best = o;
+         }
+         }
+         if (best != null) {
+         parent.debug("best is " + best.orderId);
+         boolean done;
+         switch (best.id) {
+         case 40:
+         done = idlers.get(i).repair(((Repair) best).target, frame + 400, best.orderId);
+         break;
+         case 16:
+         done = idlers.get(i).fight(best.getPosition(), frame + 700, best.orderId);
+         break;
+         default:
+         float radius = 800;
+         int space = 6;
+         if (((Build) best).building.equals(parent.mex)) {
+         radius = 0;
+         space = 1;
+         }
+         AIFloat3 pos = ((Build) best).position;
+         if (pos.x < 0) {
+         pos = idlers.get(i).unit.getPos();
+         }
+         done = idlers.get(i).build(pos, ((Build) best).building, radius, space, frame + 500, best.orderId);
 
-                        //parent.callback.getMap().getDrawer().addPoint(pos, "building here");
+         //parent.callback.getMap().getDrawer().addPoint(pos, "building here");
                         
-                        if (!inRadarRange(pos)){
-                            pending.add(new Build(pos,parent.radar,-1,lastOrderId++));
-                            virtualRadars.add(new Node((Build)pending.get(pending.size()-1),pos,parent.radar.getRadarRadius()));
-                        }
+         if (!inRadarRange(pos)){
+         pending.add(new Build(pos,parent.radar,-1,lastOrderId++));
+         virtualRadars.add(new Node((Build)pending.get(pending.size()-1),pos,parent.radar.getRadarRadius()));
+         }
 
-                }
-                if (done || !done) {
-                    pending.remove(best);
-                }
-                if (!done) {
-                    if (best.id == 40) {
-                        if (((Repair) best).target != null &&((Repair) best).target.getDef()!=null ){
-                            parent.debug("Warning: Repairing " + ((Repair) best).target.getDef().getHumanName() + " failed");
-                        }else{
-                            parent.debug("Warning: Repairing failed because target is missing");
-                        }
-                    } else {
-                        parent.debug("Warning: Building " + ((Build) best).building.getHumanName() + " failed");
-                    }
-                }
+         }
+         if (done || !done) {
+         if (!(best.id < 0 && best.getPosition().x  < 0))
+         pending.remove(best);
+         }
+         if (!done) {
+         if (best.id == 40) {
+         if (((Repair) best).target != null &&((Repair) best).target.getDef()!=null ){
+         parent.debug("Warning: Repairing " + ((Repair) best).target.getDef().getHumanName() + " failed");
+         }else{
+         parent.debug("Warning: Repairing failed because target is missing");
+         }
+         } else {
+         parent.debug("Warning: Building " + ((Build) best).building.getHumanName() + " failed");
+         }
+         }
 
-            } else {
+         } else {
 
-                parent.debug("nothing to do");
-            }
-        }
+         parent.debug("nothing to do");
+         }
+         }*/
         energyUnderConstruction /= 1.002;
-        energyUnderConstruction = Math.max(energyUnderConstruction,0);
+        energyUnderConstruction = Math.max(energyUnderConstruction, 0);
+        reserveEnergy *= 1.00008;
         if (parent.frame % 100 == 0) {
             parent.debug("Energy under construction: " + energyUnderConstruction);
 
         }
-        if (frame%42 == 0){
-            AIFloat3 pos = new AIFloat3((float)Math.random()*parent.callback.getMap().getWidth()*8,0,(float)Math.random()*parent.callback.getMap().getHeight()*8);
-            if ((parent.defense.getValue(pos,500)>100+2*parent.defense.getDefense(pos)) && parent.frame > 10000){
-                boolean busy  = false;
-                for (Order o : pending){
+        if (frame % 42 == 0) {
+            AIFloat3 pos = new AIFloat3((float) Math.random() * parent.callback.getMap().getWidth() * 8, 0, (float) Math.random() * parent.callback.getMap().getHeight() * 8);
+            if ((parent.defense.getValue(pos, 500) > 100 + 2 * parent.defense.getDefense(pos)) && parent.frame > 10000) {
+                boolean busy = false;
+                for (Order o : pending) {
                     if (o.id == -parent.llt.getUnitDefId() || o.id == -parent.hlt.getUnitDefId() || o.id == -parent.defender.getUnitDefId()
-                             || o.id == -parent.bertha.getUnitDefId()) busy = true;
+                            || o.id == -parent.bertha.getUnitDefId()) {
+                        busy = true;
+                    }
                 }
-                if (!busy){
-                    parent.debug("Building Lotus because " + parent.defense.getValue(pos)/parent.defense.maxVal  + " - 0.5 > " + 
-                            parent.defense.getDefense(pos)/Math.max(0.0001,parent.defense.maxDef));
-                    
-                    pending.add(new Build(pos,getDefenseTower(pos),-1,lastOrderId++));
+                if (!busy) {
+                    parent.debug("Building Lotus because " + parent.defense.getValue(pos) / parent.defense.maxVal + " - 0.5 > "
+                            + parent.defense.getDefense(pos) / Math.max(0.0001, parent.defense.maxDef));
+
+                    pending.add(new Build(pos, getDefenseTower(pos), -1, lastOrderId++));
                 }
             }
         }
-        if (frame % 100 == 42){
-            
-            if (parent.callback.getEconomy().getIncome(energy) < parent.callback.getEconomy().getUsage(energy)
-                    && parent.callback.getEconomy().getCurrent(energy) < 250 ) {
-                parent.debug("upgrading energy");
-                upgradeEnergy(parent.callback.getEconomy().getUsage(energy) - parent.callback.getEconomy().getIncome(energy) - energyUnderConstruction);
+        if (frame % 100 == 42) {
+            /*
+             if (parent.callback.getEconomy().getIncome(energy) < parent.callback.getEconomy().getUsage(energy)
+             && parent.callback.getEconomy().getCurrent(energy) < 250) {
+             parent.debug("upgrading energy");
+             upgradeEnergy(parent.callback.getEconomy().getUsage(energy) - parent.callback.getEconomy().getIncome(energy) - energyUnderConstruction);
 
-            }
-            if (parent.callback.getEconomy().getCurrent(metal) > 300 && parent.callback.getEconomy().getCurrent(energy) > 300 && parent.frame > 1000){
+             }*/
+            if (parent.callback.getEconomy().getCurrent(metal) > 300 && parent.callback.getEconomy().getCurrent(energy) > 300 && parent.frame > 1000) {
                 boolean buildingNano = false;
                 for (Order o : pending) {
-                    if (o.id == - parent.nano.getUnitDefId()) {
+                    if (o.id == -parent.nano.getUnitDefId()) {
                         buildingNano = true;
                     }
                 }
-                if (!buildingNano){
-                    pending.add(new Build(factories.get(0).getPos(),parent.nano,-1,lastOrderId++));
+                if (!buildingNano) {
+                    pending.add(new Build(factories.get(0).getPos(), parent.nano, -1, lastOrderId++));
                 }
-            }else {
-                parent.debug("upgrading metal");
-                List<Order> pendingc = new ArrayList();
-                pendingc.addAll(pending);
-                for (Order o : pendingc) {
-                    if (o.id == -parent.mex.getUnitDefId()) {
-                        grid.remove(findNode((Build)o));
-                        pending.remove(o);
-                    }
-                }
-                List<AIFloat3> newMexes = new ArrayList();
-                for (int i = 0; i < builders.size(); i++){
-                    AIFloat3 next = parent.expansion.nextMex(newMexes);
-                    if (next != null) {
-                        Build b =new Build(next, parent.mex, -1, lastOrderId++);
-                        pending.add(b);
-                        grid.add(new Node(b,b.position,pylonrange.get(b.building.getUnitDefId())));
-                        newMexes.add(next);
-                    } 
-                }
-                
+            } else {
+                /*parent.debug("upgrading metal");
+                 List<Order> pendingc = new ArrayList();
+                 pendingc.addAll(pending);
+                 for (Order o : pendingc) {
+                 if (o.id == -parent.mex.getUnitDefId()) {
+                 grid.remove(findNode((Build) o));
+                 pending.remove(o);
+                 }
+                 }
+                 List<AIFloat3> newMexes = new ArrayList();
+                 for (int i = 0; i < builders.size(); i++) {
+                 AIFloat3 next = parent.expansion.nextMex(newMexes);
+                 if (next != null) {
+                 Build b = new Build(next, parent.mex, -1, lastOrderId++);
+                 pending.add(b);
+                 grid.add(new Node(b, b.position, pylonrange.get(b.building.getUnitDefId())));
+                 newMexes.add(next);
+                 }
+                 }
+                 */
             }
         }
         if (frame % 100 == 0) {
+            List<Node> invalidNodes = new ArrayList();
+            for (Node n : grid) {
+                if (n.buildOrder != null) {
+                    boolean valid = false;
+                    for (Builder b : builders) {
+                        if (b.order != null && b.order.equals(n.buildOrder)) {
+                            valid = true;
+                            break;
+                        }
+                    }
+                    if (!valid) {
+                        invalidNodes.add(n);
+                    }
+                }
+            }
+            grid.removeAll(invalidNodes);
+
             for (Unit b : underConstruction) {
                 boolean found = false;
                 for (Order o : pending) {
@@ -436,33 +473,42 @@ public class BuilderHandler {
             for (Unit m : mexes) {
                 getConnectedBuildings(findNode(m));
                 parent.debug("bfs on mex");
-            }
-            for (Order o : pending) {
-                if (o.orderId < 0) {//build order
-                    Build b = (Build) o;
-                    if (b.building.equals(parent.solar) && b.getPosition().x < 0) {
-                        pending.remove(o);
-                        grid.remove(findNode(b));
-                        upgradeEnergy(2);
-                        energyUnderConstruction -= 2;
-                    }
-                }
-            }
+            }/*
+             for (Order o : pending) {
+             if (o.orderId < 0) {//build order
+             Build b = (Build) o;
+             if (b.building.equals(parent.solar) && b.getPosition().x < 0) {
+             pending.remove(o);
+             grid.remove(findNode(b));
+             upgradeEnergy(2);
+             energyUnderConstruction -= 2;
+             }
+             }
+             }*/
+
         }
     }
-    
-    Node findNode(Build b){
-        for (Node n : grid){
-            if (n.buildOrder == null) continue;
-            if (n.buildOrder.equals( b)) return n;
+
+    Node findNode(Build b) {
+        for (Node n : grid) {
+            if (n.buildOrder == null) {
+                continue;
+            }
+            if (n.buildOrder.equals(b)) {
+                return n;
+            }
         }
         return null;
     }
-    
-    Node findNode(Unit u){
-        for (Node n : grid){
-            if (n.unit == null) continue;
-            if (n.unit.equals(u)) return n;
+
+    Node findNode(Unit u) {
+        for (Node n : grid) {
+            if (n.unit == null) {
+                continue;
+            }
+            if (n.unit.equals(u)) {
+                return n;
+            }
         }
         return null;
     }
@@ -471,7 +517,9 @@ public class BuilderHandler {
         List<Node> result = new ArrayList();
         //parent.callback.getMap().getDrawer().addPoint(start.pos, "starting bfs from here");
         //parent.callback.getMap().getDrawer().addPoint(start.unit.getPos(), "= here");
-        if (start == null) return result;
+        if (start == null) {
+            return result;
+        }
         List<Node> added = new ArrayList();
         added.add(start);
         while (!added.isEmpty()) {
@@ -485,7 +533,7 @@ public class BuilderHandler {
                 //parent.debug(msg);
                 //parent.callback.getMap().getDrawer().addPoint(u.getPos(), msg);
                 for (Node o : grid) {
-                    if ( !result.contains(o) && !newadded.contains(o)
+                    if (!result.contains(o) && !newadded.contains(o)
                             && u.range + o.range >= Math.sqrt(zkai.dist(u.pos, o.pos))) {
                         newadded.add(o);
                         parent.callback.getMap().getDrawer().addLine(u.pos, o.pos);
@@ -499,64 +547,114 @@ public class BuilderHandler {
         return result;
     }
 
-    boolean upgradeEnergy(float amt) {
-        while (amt > 0) {
-            //solar
-            UnitDef unitdef = parent.solar;
-            float minval = Float.MAX_VALUE;
-            Unit best = null;
-            for (Unit m : mexes) {
-                List<Node> conn = getConnectedBuildings(findNode(m));
-                float e = 0;
-                for (Node u : conn) {
-                    if (u.unit == null) e+=2;
-                    else e += u.unit.getResourceMake(energy);
-                }
-                if (e < minval) {
-                    best = m;
+    Build upgradeEnergy(Area a) {
+        //solar
+        UnitDef unitdef = parent.solar;
+        float minval = Float.MAX_VALUE;
+        Unit best = null;
+        for (Unit m : mexes) {
+            if (Area.getArea(m.getPos()) != a) {
+                continue;
+            }
+            List<Node> conn = getConnectedBuildings(findNode(m));
+            float e = 0;
+            for (Node u : conn) {
+                if (u.unit == null) {
+                    e += 2;
+                } else {
+                    e += u.unit.getResourceMake(energy);
                 }
             }
-            if (best != null) {
-                List<Node> conn = getConnectedBuildings(findNode(best));
-                float mindist = Float.MAX_VALUE;
-                Node u1 = null, u2 = null;
-                for (Node u : conn) {
-                    for (Node b : grid) {
-                        if (conn.contains(b)) {
-                            continue;
-                        }
-                        if (zkai.dist(u.pos, b.pos) < mindist) {
-                            mindist = zkai.dist(u.pos, b.pos);
-                            u1 = u;
-                            u2 = b;
-                        }
+            if (e < minval) {
+                best = m;
+            }
+        }
+        if (best != null) {
+            List<Node> conn = getConnectedBuildings(findNode(best));
+            float mindist = Float.MAX_VALUE;
+            Node u1 = null, u2 = null;
+            for (Node u : conn) {
+                for (Node b : grid) {
+                    if (conn.contains(b)) {
+                        continue;
+                    }
+                    if (zkai.dist(u.pos, b.pos) < mindist) {
+                        mindist = zkai.dist(u.pos, b.pos);
+                        u1 = u;
+                        u2 = b;
                     }
                 }
-                if (u1 != null && u2 != null) {
-                    AIFloat3 vec = new AIFloat3(u1.pos);
-                    vec.interpolate(u2.pos, (float) (pylonrange.get(unitdef.getUnitDefId()) * 0.75 / Math.sqrt(zkai.dist(u1.pos, u2.pos))));
-                    vec = parent.callback.getMap().findClosestBuildSite(unitdef, vec, 800, 6, 0);
-                    Build b  =new Build(vec, unitdef, -1, lastOrderId++);
-                    pending.add(b);
-                    grid.add(new Node(b,b.position,pylonrange.get(b.building.getUnitDefId())));
-                    //parent.callback.getMap().getDrawer().addPoint(vec, "possible solar");
-                }
-            } else {
-                Build b = new Build(new AIFloat3(-1,-1,-1), unitdef, -1, lastOrderId++);
-                pending.add(b);
-                grid.add(new Node(b,b.position,pylonrange.get(b.building.getUnitDefId())));
             }
-            parent.debug("scheduled solar");
-            energyUnderConstruction += 2;
-            amt -= 2;
+            if (u1 != null && u2 != null) {
+                AIFloat3 vec = new AIFloat3(u1.pos);
+                vec.interpolate(u2.pos, (float) (pylonrange.get(unitdef.getUnitDefId()) * 0.75 / Math.sqrt(zkai.dist(u1.pos, u2.pos))));
+                Build b = new Build(vec, unitdef, -1, lastOrderId++);
+                return b;
+                //parent.callback.getMap().getDrawer().addPoint(vec, "possible solar");
+            }
         }
-        return true;
+        Build b = new Build(new AIFloat3(-1, -1, -1), unitdef, -1, lastOrderId++);
+        return b;
+
+    }
+
+    AIFloat3 findClosestBuildPos(AIFloat3 pos, UnitDef unit) {
+        pos = new AIFloat3(pos);
+        if (unit.equals(parent.mex)) {
+            return pos;
+        }
+        pos = parent.callback.getMap().findClosestBuildSite(unit, pos, 800, 6, 0);
+        while (zkai.dist(pos, parent.closestMetalSpot(pos)) < 70 * 70) {
+            pos.x += parent.rnd.nextInt(40) - 20;
+            pos.z += parent.rnd.nextInt(40) - 20;
+            pos = parent.callback.getMap().findClosestBuildSite(unit, pos, 800, 6, 0);
+        }
+        return pos;
+
+    }
+
+    List<Area> berthaAreas = new ArrayList();
+
+    Area getBerthaArea(int index) {
+        if (index > berthaAreas.size()) {
+            if (index == 1) {
+                List<Area> as = Area.getArea(factories.get(0).getPos()).getNearbyAreas(1);
+                as.add(Area.getArea(factories.get(0).getPos()));
+                float maxh = -100;
+                Area best = null;
+                for (Area a : as) {
+                    if (a.getCenterHeight() > maxh) {
+                        maxh = a.getCenterHeight();
+                        best = a;
+                    }
+                }
+                berthaAreas.add(best);
+            } else {
+                List<Area> as = new ArrayList();
+                for (Area a : Area.areas) {
+                    if (a.closestOfOwner(Owner.enemy).gridDistance(a) >= 3 && a.closestOfOwner(Owner.enemy).gridDistance(a) < 6) {
+                        as.add(a);
+                    }
+                }
+                float maxh = -100;
+                Area best = null;
+                for (Area a : as) {
+                    if (a.getCenterHeight() > maxh) {
+                        maxh = a.getCenterHeight();
+                        best = a;
+                    }
+                }
+                berthaAreas.add(best);
+            }
+        }
+        return berthaAreas.get(index - 1);
     }
 
     final class Builder {
 
         Unit unit;
         Order order;
+        Action action;
 
         public Builder(Unit u) {
             unit = u;
@@ -565,40 +663,339 @@ public class BuilderHandler {
 
         public void idle() {
             order = null;
-            idlers.add(this);
+
+            //idlers.add(this);
             //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "idle");
+            if (action == null) {
+                if (factories.isEmpty()) {
+                    boolean possible = true;
+                    for (Builder b : builders) {
+                        if (b.action != null && b.action.getAction() == Actions.buildFactory) {
+                            possible = false;
+                        }
+                    }
+                    if (possible) {
+                        boolean done = build(findClosestBuildPos(unit.getPos(), parent.cloaky), parent.cloaky, parent.frame + 2500, lastOrderId++);
+                        if (done) {
+                            action = new BuildFactory(Area.getArea(unit.getPos()));
+                        }
+                    }
+                }
+                if (action == null && parent.frame > 1000 && (parent.callback.getEconomy().getCurrent(energy)
+                        > 380)
+                        && parent.callback.getEconomy().getCurrent(metal) > 150) {
+                    boolean possible = true;
+                    for (Builder b : builders) {
+                        if (b.action != null && b.action.getAction() == Actions.buildFactory) {
+                            possible = false;
+                        }
+                    }
+                    if (possible) {
+                        action = new BuildFactory(Area.getArea(factories.get(0).getPos()));
+                    }
+                }
+                if (action == null) {
+                    int porcers = 0;
+                    for (Builder b : builders) {
+                        if (b.action != null && (b.action.getAction() == Actions.porc || b.action.getAction() == Actions.bertha)) {
+                            porcers++;
+                        }
+                    }
+                    if (Math.min(2, bertha) > parent.threats.berthas.size()) {
+                        parent.debug("planning on building bertha");
+                        action = new Bertha(getBerthaArea(bertha), bertha);
+
+                    }
+                    if (porcers < builders.size() / 2 && false) {
+                        float best = -1;
+                        Area besta = null;
+                        for (Area a : Area.areas) {
+                            if (a.owner != Owner.ally) {
+                                continue;
+                            }
+                            float val = parent.threats.getDanger(a.getCoords());
+                            if (val > best && parent.defense.getDefense(a.getCoords()) * 3 < a.danger / 2 + parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
+                                best = val;
+                                besta = a;
+                            }
+                        }
+                        if (besta != null) {
+                            parent.debug((parent.defense.getDefense(besta.getCoords()) * 3) + " < " + (besta.danger / 2 + parent.threats.getValue(besta.getCoords(), 5 * besta.getRadius())));
+                            action = new Porc(besta);
+                        }
+                    }
+                }
+                //parent.debug("would upgrade energy: " + String.valueOf(parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction < parent.callback.getEconomy().getUsage(energy) + reserveEnergy));
+                
+                int ebuilders = 0;
+                for (Builder b : builders){
+                    if (b.action != null && b.action.getAction() == Actions.buildEnergy) ebuilders++;
+                }
+                if (action == null && (!(parent.frame < 5000) || ebuilders == 0) && parent.frame > 500
+                        && ((parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction < parent.callback.getEconomy().getUsage(energy)
+                        + reserveEnergy && parent.callback.getEconomy().getCurrent(energy) < 100) || parent.callback.getEconomy().getIncome(energy) < reserveEnergy)) {
+                    float best = Float.MAX_VALUE;
+                    Area besta = null;
+                    Area simplea = null;
+                    float bestsimple = Float.MAX_VALUE;
+                    for (Area a : Area.areas) {
+                        if (a.getOwner() != Owner.ally) {
+                            continue;
+                        }
+                        Build b = upgradeEnergy(a);
+                        float dist = zkai.dist(a.getCoords(), unit.getPos());
+                        if (b.getPosition().x < 0 && dist < bestsimple) {
+                            bestsimple = dist;
+                            simplea = a;
+                        }
+                        if (b.getPosition().x >= 0 && dist < best) {
+                            best = dist;
+                            besta = a;
+                        }
+                    }
+                    if (besta != null) {
+                        float amt = parent.callback.getEconomy().getUsage(energy) + reserveEnergy
+                                - (parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction);
+                        amt /= 1.5;
+                        energyUnderConstruction += amt;
+                        action = new BuildEnergy(besta, amt);
+                        parent.callback.getMap().getDrawer().addPoint(besta.getCoords(), "building " + amt + " e");
+                    } else if (simplea != null) {
+                        action = new BuildEnergy(simplea, 2f);
+                        parent.callback.getMap().getDrawer().addPoint(simplea.getCoords(), "building 2 e");
+                    }
+                }
+
+                if (action == null) {
+
+                    float best = Float.MAX_VALUE;
+                    Area besta = null;
+                    for (Area a : Area.areas) {
+                        if (a.getOwner() != Owner.ally) {
+                            continue;
+                        }
+                        if (a.getFreeMexes().size() > 0 || !inRadarRange(a.getCoords())) {
+                            boolean occupied = false;
+                            for (Builder b : builders) {
+                                if (b.action != null && b.action.getAction() == Actions.buildMexes && b.action.getArea() == a) {
+                                    occupied = true;
+                                }
+                            }
+                            if (occupied) {
+
+                                //parent.callback.getMap().getDrawer().addPoint(a.getCoords(), "occupied here");
+                                continue;
+                            }
+                            float dist = (float) (Math.sqrt(zkai.dist(a.getCoords(), unit.getPos())) / Math.sqrt(Math.max(a.getFreeMexes().size(), 1))
+                                    * (parent.threats.getDanger(a.getCoords()) / parent.threats.maxval));
+                            //parent.callback.getMap().getDrawer().addPoint(a.getCoords(), dist+ " pts");
+                            if (dist < best) {
+                                best = dist;
+                                besta = a;
+                            }
+                        } else {
+                            //parent.callback.getMap().getDrawer().addPoint(a.getCoords(), "No free mexes here");
+                        }
+                    }
+                    if (besta != null) {
+                        besta.owner = Owner.ally;
+                        action = new BuildMexes(besta);
+                    } else {
+                        parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "no mexing possibilities");
+                    }
+                }
+                if (action == null) {
+                    if (Math.random() < 0.5) {
+                        action = new ReclaimAction(Area.getAllied().get(parent.rnd.nextInt(Area.getAllied().size())));
+                        unit.reclaimInArea(action.area.getCoords(), action.area.getRadius(), (short) 0, parent.frame + 1000);
+                        order = new Move(new AIFloat3(), parent.frame + 1000, lastOrderId++);
+                    } else {
+
+                        action = new RepairAction(Area.getAllied().get(parent.rnd.nextInt(Area.getAllied().size())));
+                    }
+                }
+
+            } else {
+                if (action.area.owner != Owner.ally) {
+                    action = null;
+                } else {
+                    switch (action.getAction()) {
+                        case buildFactory:
+                            if (parent.callback.getEconomy().getCurrent(metal) < 150 || parent.callback.getEconomy().getCurrent(energy) < 350 || parent.frame < 1000) {
+                                action = null;
+                            } else {
+                                build(new Build(factories.get(0).getPos(), parent.nano, -1, lastOrderId++));
+                            }
+                            break;
+                        case buildMexes:
+                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "mex");
+
+                            if (!inRadarRange(action.getArea().getCoords())) {
+                                AIFloat3 pos = findClosestBuildPos(action.getArea().getCoords(), parent.radar);
+                                build(pos, parent.radar, parent.frame + 700, lastOrderId++);
+                                virtualRadars.add(new Node((Build) order, parent.radar.getRadarRadius()));
+                            } else {
+                                float best = Float.MAX_VALUE;
+                                AIFloat3 mex = null;
+                                for (AIFloat3 m : action.area.getFreeMexes()) {
+                                    float dist = zkai.dist(m, unit.getPos());
+                                    if (dist < best) {
+                                        best = dist;
+                                        mex = m;
+                                    }
+                                }
+                                if (mex == null) {
+                                    action = null;//all mexes capped
+                                    //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "no more mex");
+                                } else {
+                                    //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "building mex");
+                                    build(mex, parent.mex, parent.frame + 500, lastOrderId++);//parent.callback.getMap().findClosestBuildSite(parent.mex, mex, 10, 0, 0)
+                                }
+                            }
+                            break;
+                        case buildEnergy:
+                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "e");
+                            if ((parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction - ((BuildEnergy) action).amount
+                                    > parent.callback.getEconomy().getUsage(energy) + reserveEnergy && parent.callback.getEconomy().getIncome(energy)
+                                    > reserveEnergy) || ((BuildEnergy) action).amount <= 0) {
+                                energyUnderConstruction -= ((BuildEnergy) action).amount;
+                                energyUnderConstruction = Math.max(energyUnderConstruction, 0);
+                                parent.debug("aborted building energy");
+                                action = null;
+                            } else {
+                                ((BuildEnergy) action).amount -= 2;
+                                build(upgradeEnergy(action.getArea()));
+                                parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "building solar");
+                            }
+                            break;
+                        case porc:
+                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "porc");
+                            if (parent.defense.getDefense(action.area.getCoords()) * 3 > action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
+                                parent.debug(parent.defense.getDefense(action.area.getCoords()) * 3 + " > " + (action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())));
+                                action = null;
+
+                            } else {
+                                Builder assist = null;
+                                for (Builder b : builders) {
+                                    if (b.action != null && b.action.getAction() == Actions.porc && b.action.area == action.area && b.order != null
+                                            && b.order.id < 0) {
+                                        assist = b;
+                                    }
+                                }
+                                if (assist == null) {
+                                    build(new Build(action.area.getCoords(), getDefenseTower(action.area.getCoords()), parent.frame + 2000, lastOrderId++));
+                                } else {
+                                    guard(assist.unit, parent.frame + 500, lastOrderId++);
+                                }
+                            }
+                            break;
+                        case reclaim:
+                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "reclaim");
+                            action = null;
+                            break;
+                        case repair:
+                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "repair");
+                            boolean busy = false;
+                            for (Unit u : parent.callback.getFriendlyUnitsIn(action.area.getCoords(), action.area.getRadius())) {
+                                if (u.getUnitId() != unit.getUnitId() && u.getHealth() < u.getMaxHealth() && !(u.isBeingBuilt() && zkai.dist(u.getPos(), factories.get(0).getPos()) < 100 * 100)) {
+                                    repair(u, parent.frame + 500, lastOrderId++);
+                                    busy = true;
+                                    break;
+                                }
+                            }
+                            if (!busy) {
+                                action = null;
+                            }
+                            break;
+                        case bertha:
+                            parent.debug("building bertha");
+                            Bertha bb = (Bertha) action;
+                            Builder assist = null;
+                            for (Builder b : builders) {
+                                if (b.action != null && b.action.getAction() == Actions.bertha && ((Bertha) b.action).index == bb.index
+                                        && b.order != null && b.order.id < 0) {
+                                    assist = b;
+                                }
+                            }
+                            if (assist != null) {
+                                guard(assist.unit, parent.frame + 2000, lastOrderId++);
+                            } else {
+                                build(new Build(action.area.getCoords(), parent.bertha, parent.frame + 2000, lastOrderId++));
+                            }
+                            break;
+                        default:
+
+                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "unknown action");
+                    }
+                }
+                if (action == null) {
+                    idle();
+                }
+            }
+            if (action == null) {
+
+                //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "idle");
+            } else {
+
+                //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "action: " + action.getAction().name());
+            }
         }
 
         public boolean update(int frame) {//returns if idle
-            if (order != null && frame > order.timeout && unit.getCurrentCommands().isEmpty()) {
+            if (parent.frame % 50 == 0) {
+                if (order == null) {
+                    parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "null");
+                } else {
+
+                    //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "cmd: " + order.id);
+                }
+            }
+            if (order != null && frame > order.timeout && (!(order.id < 0) || unit.getCurrentCommands().isEmpty())) {
                 parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "order timed out");
                 idle();
             }
-            if (!(parent.callback.getEnemyUnitsIn(unit.getPos(), 600) == null || 
-                    parent.callback.getEnemyUnitsIn(unit.getPos(), 600).isEmpty()) && (order == null ||
-                    zkai.dist(unit.getPos(),order.getPosition())> 150*150)){
-                
-                if(order !=null && order.id < 0){
-                    grid.remove(findNode((Build)order));
+            if (!(parent.threats.getValue(unit.getPos(), 600)== 0) && (order == null
+                    || zkai.dist(unit.getPos(), order.getPosition()) > 150 * 150)) {
+
+                if (order != null && order.id < 0) {
+                    grid.remove(findNode((Build) order));
                 }
-                if (parent.callback.getFriendlyUnitsIn(unit.getPos(), 500).size() > 4){
-                    if (parent.rnd.nextBoolean()) build(unit.getPos(),getDefenseTower(unit.getPos()),100,3,frame+500,lastOrderId++);
-                    else {
+                if (parent.callback.getFriendlyUnitsIn(unit.getPos(), 500).size() > 4) {
+                    if (parent.rnd.nextBoolean()) {
+                        //build(findClosestBuildPos(unit.getPos(), getDefenseTower(unit.getPos())), getDefenseTower(unit.getPos()), frame + 500, lastOrderId++);
+
                         AIFloat3 pos = new AIFloat3(unit.getPos());
-                        pos.add(new AIFloat3(50,0,50));
-                        fight(pos,frame+200,lastOrderId++);
+                        pos.add(new AIFloat3(50, 0, 50));
+                        fight(pos, frame + 600, lastOrderId++);
+                        unit.reclaimInArea(unit.getPos(), 300f, (short) 0, parent.frame + 600);
+                    } else {
+                        AIFloat3 pos = new AIFloat3(unit.getPos());
+                        pos.add(new AIFloat3(50, 0, 50));
+                        fight(pos, frame + 600, lastOrderId++);
                     }
-                }else{
-                    move(factories.get(0).getPos(),frame+100,lastOrderId++);
+                } else {
+                    //move(factories.get(0).getPos(), frame + 400, lastOrderId++);
                 }
+            }
+
+            if (order == null || action == null) {
+                idle();
             }
             return order == null;
         }
 
-        public boolean build(AIFloat3 p, UnitDef b, float r, int spacing, int t, int orderid) {
-            if (r > 0) {
-                p = parent.callback.getMap().findClosestBuildSite(b, p, r, spacing, 0);
+        public boolean build(Build order) {
+            if (order.timeout < 0) {
+                order.timeout = parent.frame + 1000;
             }
+            if (order.position.x < 0) {
+                order.position = unit.getPos();
+            }
+            return build(findClosestBuildPos(order.position, order.building), order.building, order.timeout, order.orderId);
+        }
+
+        public boolean build(AIFloat3 p, UnitDef b, int t, int orderid) {
+
             if (p.x < 0) {
                 return false;
             }
@@ -607,6 +1004,9 @@ public class BuilderHandler {
             }
             unit.build(b, p, 0, (short) 0, t);
             order = new Build(p, b, t, orderid);
+            if (pylonrange.containsKey(b.getUnitDefId())) {
+                grid.add(new Node((Build) order, pylonrange.get(b.getUnitDefId())));
+            }
             if (idlers.contains(this)) {
                 idlers.remove(this);
             }
@@ -625,11 +1025,24 @@ public class BuilderHandler {
             }
             return true;
         }
-        
+
+        public boolean guard(Unit trg, int t, int orderid) {
+
+            if (trg.getAllyTeam() != parent.team) {
+                return false;
+            }
+            unit.guard(trg, (short) 0, t);
+            order = new Guard(trg, t, orderid);
+            if (idlers.contains(this)) {
+                idlers.remove(this);
+            }
+            return true;
+        }
+
         public boolean fight(AIFloat3 trg, int t, int orderid) {
-            
-            parent.debug("fighting to " + trg.toString() + " (" + parent.callback.getMap().getWidth()*8 +"|" +
-                    parent.callback.getMap().getHeight()*8+") until " + t);
+
+            parent.debug("fighting to " + trg.toString() + " (" + parent.callback.getMap().getWidth() * 8 + "|"
+                    + parent.callback.getMap().getHeight() * 8 + ") until " + t);
             unit.fight(trg, (short) 0, t);
             order = new Fight(trg, t, orderid);
             if (idlers.contains(this)) {
@@ -637,10 +1050,11 @@ public class BuilderHandler {
             }
             return true;
         }
+
         public boolean move(AIFloat3 trg, int t, int orderid) {
 
             unit.moveTo(trg, (short) 0, t);
-            order = new Fight(trg, t, orderid);
+            order = new Move(trg, t, orderid);
             if (idlers.contains(this)) {
                 idlers.remove(this);
             }
@@ -669,6 +1083,13 @@ public class BuilderHandler {
             range = r;
             unit = null;
         }
+
+        public Node(Build b, float r) {
+            buildOrder = b;
+            pos = b.getPosition();
+            range = r;
+            unit = null;
+        }
     }
 
     class Move extends Order {
@@ -689,6 +1110,7 @@ public class BuilderHandler {
     }
 
     int maxOI = -1;
+
     class Build extends Order {
 
         UnitDef building;
@@ -700,7 +1122,7 @@ public class BuilderHandler {
             position = pos;
             this.building = building;
             orderId = oi;
-            if (oi > maxOI){
+            if (oi > maxOI) {
                 //parent.callback.getMap().getDrawer().addPoint(pos, building.getHumanName() + " here");
                 maxOI = oi;
             }
@@ -730,7 +1152,25 @@ public class BuilderHandler {
             return target.getPos();
         }
     }
-    
+
+    class Guard extends Order {
+
+        Unit target;
+
+        public Guard(Unit target, int t, int oi) {
+            //parent.callback.getMap().getDrawer().addPoint(target.getPos(), "going to be repaired");
+            timeout = t;
+            id = 25;
+            this.target = target;
+            orderId = oi;
+        }
+
+        @Override
+        public AIFloat3 getPosition() {
+            return target.getPos();
+        }
+    }
+
     class Fight extends Order {
 
         AIFloat3 target;
@@ -762,4 +1202,114 @@ public class BuilderHandler {
         int timeout;
     }
 
+    class ReclaimAction extends Action {
+
+        public ReclaimAction(Area a) {
+            area = a;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.reclaim;
+        }
+    }
+
+    class RepairAction extends Action {
+
+        public RepairAction(Area a) {
+            area = a;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.repair;
+        }
+    }
+
+    class BuildFactory extends Action {
+
+        public BuildFactory(Area a) {
+            area = a;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.buildFactory;
+        }
+    }
+
+    class Bertha extends Action {
+
+        int index;
+
+        public Bertha(Area a, int index) {
+            area = a;
+            this.index = index;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.bertha;
+        }
+    }
+
+    class BuildMexes extends Action {
+
+        public BuildMexes(Area a) {
+            area = a;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.buildMexes;
+        }
+    }
+
+    class BuildEnergy extends Action {
+
+        float amount;
+
+        public BuildEnergy(Area a, float amt) {
+            area = a;
+            amount = amt;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.buildEnergy;
+        }
+    }
+
+    class Porc extends Action {
+
+        public Porc(Area a) {
+            area = a;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.porc;
+        }
+    }
+
+    abstract class Action {
+
+        public boolean equals(Action o) {
+            return super.equals(o);//didnt feel like implementing this
+        }
+
+        Area area;
+
+        public Area getArea() {
+            return area;
+        }
+
+        abstract public Actions getAction();
+
+    }
+
+    enum Actions {
+
+        reclaim, repair, buildFactory, buildMexes, buildEnergy, porc, bertha;
+    }
 }

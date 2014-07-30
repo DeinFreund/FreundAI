@@ -6,7 +6,6 @@
 package zkai;
 
 import com.springrts.ai.oo.AIFloat3;
-import com.springrts.ai.oo.clb.Unit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +18,7 @@ public class ExpansionHandler {
     zkai parent;
     
     
-
+    
     public ExpansionHandler(zkai parent) {
         this.parent = parent;
     }

@@ -63,6 +63,7 @@ public class BuilderHandler {
         pylonrange.put(parent.mex.getUnitDefId(), 50f);
         pylonrange.put(parent.solar.getUnitDefId(), 100f);
         pylonrange.put(parent.wind.getUnitDefId(), 60f);
+        pylonrange.put(parent.fusion.getUnitDefId(), 150f);
 
         parent.debug("DEBUG: " + pylonrange.get(parent.mex.getUnitDefId()));
 
@@ -140,7 +141,7 @@ public class BuilderHandler {
                     n.unit = u;
                     n.buildOrder = null;
                     n.pos = u.getPos();
-                    //parent.callback.getMap().getDrawer().addPoint(u.getPos(), "node established");
+                    //parent.label(u.getPos(), "node established");
                     b.order.timeout = parent.frame + 500;
                     break;
                 }
@@ -150,7 +151,7 @@ public class BuilderHandler {
                 if (n.buildOrder != null && n.buildOrder.equals(((Build) b.order))) {
                     n.unit = u;
                     n.buildOrder = null;
-                    parent.callback.getMap().getDrawer().addPoint(u.getPos(), "radar node established");
+                    parent.label(u.getPos(), "radar node established");
                     b.order.timeout += (int) (((Build) b.order).building.getBuildTime() * 30);
                     break;
                 }
@@ -170,7 +171,7 @@ public class BuilderHandler {
         if (u.getDef().equals(parent.mex)) {
             mexes.add(u);
             buildings.add(u);
-            //parent.callback.getMap().getDrawer().addPoint(u.getPos(), "new mex");
+            //parent.label(u.getPos(), "new mex");
         }
         if (u.getDef().equals(parent.solar)) {
             buildings.add(u);
@@ -343,7 +344,7 @@ public class BuilderHandler {
          }
          done = idlers.get(i).build(pos, ((Build) best).building, radius, space, frame + 500, best.orderId);
 
-         //parent.callback.getMap().getDrawer().addPoint(pos, "building here");
+         //parent.label(pos, "building here");
                         
          if (!inRadarRange(pos)){
          pending.add(new Build(pos,parent.radar,-1,lastOrderId++));
@@ -375,6 +376,7 @@ public class BuilderHandler {
         energyUnderConstruction /= 1.002;
         energyUnderConstruction = Math.max(energyUnderConstruction, 0);
         reserveEnergy *= 1.00008;
+        if (parent.frame % 30000 == 0 && Area.getAllied().size() > 0.2*Area.areas.size()) bertha ++;
         if (parent.frame % 100 == 0) {
             parent.debug("Energy under construction: " + energyUnderConstruction);
 
@@ -515,8 +517,8 @@ public class BuilderHandler {
 
     List<Node> getConnectedBuildings(Node start) {
         List<Node> result = new ArrayList();
-        //parent.callback.getMap().getDrawer().addPoint(start.pos, "starting bfs from here");
-        //parent.callback.getMap().getDrawer().addPoint(start.unit.getPos(), "= here");
+        //parent.label(start.pos, "starting bfs from here");
+        //parent.label(start.unit.getPos(), "= here");
         if (start == null) {
             return result;
         }
@@ -531,13 +533,13 @@ public class BuilderHandler {
                 //String msg = "range: " + (pylonrange.get(u.getDef().getUnitDefId()) + MAX_PYLONRANGE) + " -> "
                 //       + parent.callback.getFriendlyUnitsIn(u.getPos(), pylonrange.get(u.getDef().getUnitDefId())+ MAX_PYLONRANGE).size() + " units";
                 //parent.debug(msg);
-                //parent.callback.getMap().getDrawer().addPoint(u.getPos(), msg);
+                //parent.label(u.getPos(), msg);
                 for (Node o : grid) {
                     if (!result.contains(o) && !newadded.contains(o)
                             && u.range + o.range >= Math.sqrt(zkai.dist(u.pos, o.pos))) {
                         newadded.add(o);
                         parent.callback.getMap().getDrawer().addLine(u.pos, o.pos);
-                        //parent.callback.getMap().getDrawer().addPoint(o.getPos(), "connected to mex");
+                        //parent.label(o.getPos(), "connected to mex");
                     }
                 }
 
@@ -547,9 +549,9 @@ public class BuilderHandler {
         return result;
     }
 
-    Build upgradeEnergy(Area a) {
+    Build upgradeEnergy(Area a, UnitDef unitdef) {
         //solar
-        UnitDef unitdef = parent.solar;
+        //UnitDef unitdef = parent.solar;
         float minval = Float.MAX_VALUE;
         Unit best = null;
         for (Unit m : mexes) {
@@ -563,6 +565,7 @@ public class BuilderHandler {
                     e += 2;
                 } else {
                     e += u.unit.getResourceMake(energy);
+                    e -= u.unit.getResourceUse(energy);
                 }
             }
             if (e < minval) {
@@ -590,7 +593,7 @@ public class BuilderHandler {
                 vec.interpolate(u2.pos, (float) (pylonrange.get(unitdef.getUnitDefId()) * 0.75 / Math.sqrt(zkai.dist(u1.pos, u2.pos))));
                 Build b = new Build(vec, unitdef, -1, lastOrderId++);
                 return b;
-                //parent.callback.getMap().getDrawer().addPoint(vec, "possible solar");
+                //parent.label(vec, "possible solar");
             }
         }
         Build b = new Build(new AIFloat3(-1, -1, -1), unitdef, -1, lastOrderId++);
@@ -665,7 +668,7 @@ public class BuilderHandler {
             order = null;
 
             //idlers.add(this);
-            //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "idle");
+            //parent.label(unit.getPos(), "idle");
             if (action == null) {
                 if (factories.isEmpty()) {
                     boolean possible = true;
@@ -706,7 +709,7 @@ public class BuilderHandler {
                         action = new Bertha(getBerthaArea(bertha), bertha);
 
                     }
-                    if (porcers < builders.size() / 2 && false) {
+                    if (porcers < builders.size() / 2 && zkai.DEFENSES) {
                         float best = -1;
                         Area besta = null;
                         for (Area a : Area.areas) {
@@ -742,7 +745,7 @@ public class BuilderHandler {
                         if (a.getOwner() != Owner.ally) {
                             continue;
                         }
-                        Build b = upgradeEnergy(a);
+                        Build b = upgradeEnergy(a,parent.solar);
                         float dist = zkai.dist(a.getCoords(), unit.getPos());
                         if (b.getPosition().x < 0 && dist < bestsimple) {
                             bestsimple = dist;
@@ -759,10 +762,10 @@ public class BuilderHandler {
                         amt /= 1.5;
                         energyUnderConstruction += amt;
                         action = new BuildEnergy(besta, amt);
-                        parent.callback.getMap().getDrawer().addPoint(besta.getCoords(), "building " + amt + " e");
+                        parent.label(besta.getCoords(), "building " + amt + " e");
                     } else if (simplea != null) {
                         action = new BuildEnergy(simplea, 2f);
-                        parent.callback.getMap().getDrawer().addPoint(simplea.getCoords(), "building 2 e");
+                        parent.label(simplea.getCoords(), "building 2 e");
                     }
                 }
 
@@ -783,32 +786,32 @@ public class BuilderHandler {
                             }
                             if (occupied) {
 
-                                //parent.callback.getMap().getDrawer().addPoint(a.getCoords(), "occupied here");
+                                //parent.label(a.getCoords(), "occupied here");
                                 continue;
                             }
                             float dist = (float) (Math.sqrt(zkai.dist(a.getCoords(), unit.getPos())) / Math.sqrt(Math.max(a.getFreeMexes().size(), 1))
                                     * (parent.threats.getDanger(a.getCoords()) / parent.threats.maxval));
-                            //parent.callback.getMap().getDrawer().addPoint(a.getCoords(), dist+ " pts");
+                            //parent.label(a.getCoords(), dist+ " pts");
                             if (dist < best) {
                                 best = dist;
                                 besta = a;
                             }
                         } else {
-                            //parent.callback.getMap().getDrawer().addPoint(a.getCoords(), "No free mexes here");
+                            //parent.label(a.getCoords(), "No free mexes here");
                         }
                     }
                     if (besta != null) {
                         besta.owner = Owner.ally;
                         action = new BuildMexes(besta);
                     } else {
-                        parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "no mexing possibilities");
+                        parent.label(unit.getPos(), "no mexing possibilities");
                     }
                 }
                 if (action == null) {
                     if (Math.random() < 0.5) {
                         action = new ReclaimAction(Area.getAllied().get(parent.rnd.nextInt(Area.getAllied().size())));
-                        unit.reclaimInArea(action.area.getCoords(), action.area.getRadius(), (short) 0, parent.frame + 1000);
-                        order = new Move(new AIFloat3(), parent.frame + 1000, lastOrderId++);
+                        unit.reclaimInArea(action.area.getCoords(), action.area.getRadius(), (short) 0, parent.frame + 2000);
+                        order = new Move(new AIFloat3(), parent.frame + 2000, lastOrderId++);
                     } else {
 
                         action = new RepairAction(Area.getAllied().get(parent.rnd.nextInt(Area.getAllied().size())));
@@ -828,7 +831,7 @@ public class BuilderHandler {
                             }
                             break;
                         case buildMexes:
-                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "mex");
+                            parent.label(unit.getPos(), "mex");
 
                             if (!inRadarRange(action.getArea().getCoords())) {
                                 AIFloat3 pos = findClosestBuildPos(action.getArea().getCoords(), parent.radar);
@@ -846,15 +849,15 @@ public class BuilderHandler {
                                 }
                                 if (mex == null) {
                                     action = null;//all mexes capped
-                                    //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "no more mex");
+                                    //parent.label(unit.getPos(), "no more mex");
                                 } else {
-                                    //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "building mex");
+                                    //parent.label(unit.getPos(), "building mex");
                                     build(mex, parent.mex, parent.frame + 500, lastOrderId++);//parent.callback.getMap().findClosestBuildSite(parent.mex, mex, 10, 0, 0)
                                 }
                             }
                             break;
                         case buildEnergy:
-                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "e");
+                            parent.label(unit.getPos(), "e");
                             if ((parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction - ((BuildEnergy) action).amount
                                     > parent.callback.getEconomy().getUsage(energy) + reserveEnergy && parent.callback.getEconomy().getIncome(energy)
                                     > reserveEnergy) || ((BuildEnergy) action).amount <= 0) {
@@ -863,13 +866,30 @@ public class BuilderHandler {
                                 parent.debug("aborted building energy");
                                 action = null;
                             } else {
-                                ((BuildEnergy) action).amount -= 2;
-                                build(upgradeEnergy(action.getArea()));
-                                parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "building solar");
+                                Unit rep = null;
+                                for (Unit u : parent.callback.getFriendlyUnitsIn(unit.getPos(), 500)){
+                                    if (u.isBeingBuilt() && pylonrange.containsKey(u.getDef().getUnitDefId())){
+                                        rep = u;
+                                    }
+                                }
+                                if (rep == null){
+                                    UnitDef def;
+                                    if (parent.callback.getEconomy().getIncome(energy) > 100){
+                                        def = parent.fusion;
+                                        ((BuildEnergy) action).amount -= 35;
+                                    }else{
+                                        def = parent.solar;
+                                        ((BuildEnergy) action).amount -= 2;
+                                    }
+                                    build(upgradeEnergy(action.getArea(), def));
+                                }else{
+                                    repair(rep, parent.frame + 800 , lastOrderId++);
+                                }
                             }
                             break;
                         case porc:
-                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "porc");
+                            parent.label(unit.getPos(), "porc");
+                            parent.debug("porcing" + zkai.DEFENSES);
                             if (parent.defense.getDefense(action.area.getCoords()) * 3 > action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
                                 parent.debug(parent.defense.getDefense(action.area.getCoords()) * 3 + " > " + (action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())));
                                 action = null;
@@ -890,11 +910,11 @@ public class BuilderHandler {
                             }
                             break;
                         case reclaim:
-                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "reclaim");
+                            parent.label(unit.getPos(), "reclaim");
                             action = null;
                             break;
                         case repair:
-                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "repair");
+                            parent.label(unit.getPos(), "repair");
                             boolean busy = false;
                             for (Unit u : parent.callback.getFriendlyUnitsIn(action.area.getCoords(), action.area.getRadius())) {
                                 if (u.getUnitId() != unit.getUnitId() && u.getHealth() < u.getMaxHealth() && !(u.isBeingBuilt() && zkai.dist(u.getPos(), factories.get(0).getPos()) < 100 * 100)) {
@@ -925,7 +945,7 @@ public class BuilderHandler {
                             break;
                         default:
 
-                            parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "unknown action");
+                            parent.label(unit.getPos(), "unknown action");
                     }
                 }
                 if (action == null) {
@@ -934,24 +954,24 @@ public class BuilderHandler {
             }
             if (action == null) {
 
-                //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "idle");
+                //parent.label(unit.getPos(), "idle");
             } else {
 
-                //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "action: " + action.getAction().name());
+                //parent.label(unit.getPos(), "action: " + action.getAction().name());
             }
         }
 
         public boolean update(int frame) {//returns if idle
             if (parent.frame % 50 == 0) {
                 if (order == null) {
-                    parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "null");
+                    parent.label(unit.getPos(), "null");
                 } else {
 
-                    //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "cmd: " + order.id);
+                    //parent.label(unit.getPos(), "cmd: " + order.id);
                 }
             }
             if (order != null && frame > order.timeout && (!(order.id < 0) || unit.getCurrentCommands().isEmpty())) {
-                parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "order timed out");
+                parent.label(unit.getPos(), "order timed out");
                 idle();
             }
             if (!(parent.threats.getValue(unit.getPos(), 600)== 0) && (order == null
@@ -961,7 +981,7 @@ public class BuilderHandler {
                     grid.remove(findNode((Build) order));
                 }
                 if (parent.callback.getFriendlyUnitsIn(unit.getPos(), 500).size() > 4) {
-                    if (parent.rnd.nextBoolean()) {
+                    if (parent.rnd.nextBoolean() || zkai.dist(unit.getPos(), factories.get(0).getPos()) < 300) {
                         //build(findClosestBuildPos(unit.getPos(), getDefenseTower(unit.getPos())), getDefenseTower(unit.getPos()), frame + 500, lastOrderId++);
 
                         AIFloat3 pos = new AIFloat3(unit.getPos());
@@ -1123,7 +1143,7 @@ public class BuilderHandler {
             this.building = building;
             orderId = oi;
             if (oi > maxOI) {
-                //parent.callback.getMap().getDrawer().addPoint(pos, building.getHumanName() + " here");
+                //parent.label(pos, building.getHumanName() + " here");
                 maxOI = oi;
             }
 
@@ -1140,7 +1160,7 @@ public class BuilderHandler {
         Unit target;
 
         public Repair(Unit target, int t, int oi) {
-            //parent.callback.getMap().getDrawer().addPoint(target.getPos(), "going to be repaired");
+            //parent.label(target.getPos(), "going to be repaired");
             timeout = t;
             id = 40;
             this.target = target;
@@ -1158,7 +1178,7 @@ public class BuilderHandler {
         Unit target;
 
         public Guard(Unit target, int t, int oi) {
-            //parent.callback.getMap().getDrawer().addPoint(target.getPos(), "going to be repaired");
+            //parent.label(target.getPos(), "going to be repaired");
             timeout = t;
             id = 25;
             this.target = target;
@@ -1176,7 +1196,7 @@ public class BuilderHandler {
         AIFloat3 target;
 
         public Fight(AIFloat3 target, int t, int oi) {
-            //parent.callback.getMap().getDrawer().addPoint(target.getPos(), "going to be repaired");
+            //parent.label(target.getPos(), "going to be repaired");
             timeout = t;
             id = 16;
             this.target = target;

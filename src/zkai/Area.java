@@ -39,7 +39,7 @@ public class Area {
         this.x = x;
         this.y = y;
         fighters = parent.threats.new Squad();
-        //parent.callback.getMap().getDrawer().addPoint(getCoords(), x + "|" + y);
+        //parent.label(getCoords(), x + "|" + y);
         parent.callback.getMap().getDrawer().addLine(getTopLeftCorner(), new AIFloat3(getTopLeftCorner().x, 0, getBottomRightCorner().z));
         parent.callback.getMap().getDrawer().addLine(getTopLeftCorner(), new AIFloat3(getBottomRightCorner().x, 0, getTopLeftCorner().z));
         parent.callback.getMap().getDrawer().addLine(getBottomRightCorner(), new AIFloat3(getTopLeftCorner().x, 0, getBottomRightCorner().z));
@@ -113,7 +113,9 @@ public class Area {
             totAreas++;
             totUnits += a.fighters.size();
         }
-        if (parent.frame < 4000) return;
+        if (parent.frame < 5000) {
+            return;
+        }
         int unitsUsed = 0;
         for (Area a : areas) {
             if (a.owner != Owner.ally) {
@@ -125,12 +127,13 @@ public class Area {
             unitsUsed += a.guaranteedUnits;
             //a.guaranteedUnits += totUnits / 2 / totAreas;
         }
+        while (unitsUsed < totUnits) {
+            for (int i = 0; unitsUsed < totUnits && i < getAllied().size(); i++) {
+                if (getAllied().get(i).isBorder()) {
+                    getAllied().get(i).guaranteedUnits++;
+                    unitsUsed++;
 
-        for (int i = 0; unitsUsed < totUnits && i < getAllied().size(); i++) {
-            if (getAllied().get(i).isBorder()) {
-                getAllied().get(i).guaranteedUnits++;
-                unitsUsed++;
-
+                }
             }
         }
     }
@@ -161,8 +164,10 @@ public class Area {
         if (owner == Owner.ally) {
 
             for (Area a : getNearbyAreas(1)) {
-                if (newlyCapped) break;
-                if (a.getOwner() == Owner.neutral && parent.frame%300 == 0 && !(parent.builder.factories.size() > 0
+                if (newlyCapped) {
+                    break;
+                }
+                if (a.getOwner() == Owner.neutral && parent.frame % 300 == 0 && !(parent.builder.factories.size() > 0
                         && Area.getArea(parent.builder.factories.get(0).getPos()) == this && parent.frame < 4000 && getUnitcount() < 10)) {
                     boolean dangerous = false;
                     for (Area n : a.getNearbyAreas(1)) {
@@ -174,6 +179,25 @@ public class Area {
                         a.setOwner(Owner.ally);
                         a.newlyCapped = true;
                         parent.debug("expanding to " + a.x + "|" + a.y);
+                        break;
+                    }
+                }
+            }
+            for (Area a : getNearbyAreas(1)) {
+                if (newlyCapped) {
+                    break;
+                }
+                if (a.getOwner() == Owner.neutral && parent.frame % 750 == 0) {
+                    boolean dangerous = false;
+                    for (Area n : a.getNearbyAreas(1)) {
+                        if (n.owner == Owner.ally) {
+                            dangerous = true;
+                        }
+                    }
+                    if (!dangerous) {
+                        a.setOwner(Owner.enemy);
+                        a.newlyCapped = true;
+                        parent.debug("enemy expanding to " + a.x + "|" + a.y);
                         break;
                     }
                 }
@@ -196,7 +220,8 @@ public class Area {
                 }
                 for (Fighter f : fighters.fighters) {
                     AIFloat3 pt = new AIFloat3(parent.rnd.nextFloat() * getWidth() + getWidth() * x, 0, parent.rnd.nextFloat() * getHeight() + getHeight() * y);
-                    if (Math.sqrt(zkai.dist(getCoords(), threat)) < getRadius() * 3) {
+                    if (Math.sqrt(zkai.dist(getCoords(), threat)) < getRadius() * 5 && (Area.getArea(threat).owner == Owner.ally ||
+                            parent.threats.getDanger(threat) / parent.threats.maxval < 0.3)) {
                         f.unit.fight(threat, (short) 0, parent.frame + 500);
                     } else if ((zkai.dist(f.unit.getPos(), getCoords())) < 0.25 * (getHeight() * getHeight() + getWidth() * getWidth())) {
                         f.unit.patrolTo(pt, (short) 0, parent.frame + 500);
@@ -290,22 +315,22 @@ public class Area {
         }
         return res;
     }
-    
-    public int gridDistance(Area other){
-        return Math.max(Math.abs(x-other.x),Math.abs(y-other.y));
+
+    public int gridDistance(Area other) {
+        return Math.max(Math.abs(x - other.x), Math.abs(y - other.y));
     }
-    
-    public Area closestOfOwner(Owner o){
-        int best= Integer.MAX_VALUE;
+
+    public Area closestOfOwner(Owner o) {
+        int best = Integer.MAX_VALUE;
         Area besta = null;
-        for (Area a : Area.areas){
-            if (a.gridDistance(this) < best && a.owner == o){
+        for (Area a : Area.areas) {
+            if (a.gridDistance(this) < best && a.owner == o) {
                 best = a.gridDistance(this);
                 besta = a;
             }
         }
         return besta;
-        
+
     }
 
     public List<AIFloat3> getFreeMexes() {
@@ -319,18 +344,18 @@ public class Area {
             }
         }
         //parent.callback.getMap().getDrawer().deletePointsAndLines(getCoords());
-        //parent.callback.getMap().getDrawer().addPoint(getCoords(),  res.size() + " free mexes");
+        //parent.label(getCoords(),  res.size() + " free mexes");
         return res;
     }
-    
-    public float getCenterHeight(){
+
+    public float getCenterHeight() {
         return getHeight(getCoords());
     }
 
-    static public float getHeight(AIFloat3 pos){
-        return parent.callback.getMap().getHeightMap().get(Math.round(pos.z/8)*parent.callback.getMap().getWidth() + Math.round(pos.x/8));
+    static public float getHeight(AIFloat3 pos) {
+        return parent.callback.getMap().getHeightMap().get(Math.round(pos.z / 8) * parent.callback.getMap().getWidth() + Math.round(pos.x / 8));
     }
-    
+
     static public void init(zkai p) {
         parent = p;
         map = new Area[8][8];

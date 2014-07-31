@@ -26,6 +26,8 @@ import zkai.BuilderHandler.Order;
  */
 public class zkai extends com.springrts.ai.oo.AbstractOOAI {
 
+    public static final boolean DEFENSES = false;    
+    
     List<Unit> builders = new ArrayList();
     List<Unit> fighters = new ArrayList();
     List<Unit> radars = new ArrayList();
@@ -38,7 +40,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     public Unit com;
     int team = 0;
     Unit fac = null;
-    UnitDef solar, mex, wind, cloaky, rector, glaive, rocko, warrior, radar, nano, defender, llt, hlt, bertha, hammer, zeus, sniper;
+    UnitDef solar, mex, wind, cloaky, rector, glaive, rocko, warrior, radar, nano, defender, llt, hlt, bertha, hammer, zeus, sniper, fusion;
     List<AIFloat3> availablemetalspots = new ArrayList();
     ThreatHandler threats;
     int frame = 0;
@@ -108,6 +110,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
         if (enemy.getAllyTeam() == team) {
             debug("enterlos added friend");
         }
+        
         if (enemy.getMaxSpeed() < 0.5 || enemy.getDef().getMaxAcceleration() == 0) {
             //found building
             Area.getArea(enemy.getPos()).setOwner(Owner.enemy);
@@ -197,6 +200,10 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                     warrior = def;
                     debug("found warrior");
                 }
+                if (def.getName().equals("armfus")) {
+                    fusion = def;
+                    debug("found fusion");
+                }
                 if (def.getName().equals("armham")) {
                     hammer = def;
                     debug("found hammer");
@@ -260,9 +267,11 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             defense = new DefenseMap(this);
             Area.init(this);
             expansion = new ExpansionHandler(this);
-            team = callback.getGame().getMyTeam();
+            team = callback.getGame().getMyAllyTeam();
             AIFloat3 startpos = parseStartScript();
+            debug("i'm team " + team);
             callback.getGame().sendTextMessage("gl hf", 0);
+            callback.getGame().sendTextMessage("porc: " + DEFENSES, 0);
             debug("There are " + callback.getGroups().size() + " groups.");
         } catch (Exception ex) {
             printException(ex);
@@ -654,9 +663,13 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     }
 
     public void debug(String s) {
-        callback.getGame().sendTextMessage(s, 0);
+        callback.getGame().sendTextMessage(s, callback.getGame().getMyTeam());
     }
-
+    
+    public void label(AIFloat3 pos ,String s) {
+        debug(s);
+        //callback.getMap().getDrawer().addPoint(pos,s);
+    }
     @Override
     public int unitCreated(Unit unit, Unit builder) {
 

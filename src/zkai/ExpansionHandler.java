@@ -39,7 +39,7 @@ public class ExpansionHandler {
             }
         }
         if (maxv != null) {
-            //parent.callback.getMap().getDrawer().addPoint(maxv, "recommended mex");
+            //parent.label(maxv, "recommended mex");
             return maxv;
         }
         maxv = null;
@@ -58,7 +58,7 @@ public class ExpansionHandler {
             }
         }
         if (maxv != null) {
-            //parent.callback.getMap().getDrawer().addPoint(maxv, "recommended mex");
+            //parent.label(maxv, "recommended mex");
             return maxv;
         }
         parent.debug("WARNING: no metal spot found for expansion");

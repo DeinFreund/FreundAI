@@ -86,12 +86,12 @@ public class ThreatHandler {
                 value = 1;
             }
             if (value > 50) {
-                //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "enemy " + unit.getDef().getTooltip() + ": " + value);
+                //parent.label(unit.getPos(), "enemy " + unit.getDef().getTooltip() + ": " + value);
             }
             parent.debug("adding " + unit.getDef().getHumanName());
         } else {
 
-            //parent.callback.getMap().getDrawer().addPoint(unit.getPos(), "enemy unknown: " + value);
+            //parent.label(unit.getPos(), "enemy unknown: " + value);
         }
         for (Enemy e : enemies) {
             if (e.unit.equals(unit)) {
@@ -131,7 +131,7 @@ public class ThreatHandler {
     }
 
     public void addPoint(AIFloat3 point, float value) {
-        //parent.callback.getMap().getDrawer().addPoint(point, "danger: " + value);
+        //parent.label(point, "danger: " + value);
         points.add(new Point(point, value));
     }
 
@@ -512,12 +512,18 @@ public class ThreatHandler {
                 }
 
             }
+            
+            List<Unit> foes = parent.callback.getEnemyUnitsIn(fighters.get(i).unit.getPos(), fighters.get(i).unit.getMaxRange()*3);
+            for (Unit u : foes){
+                if (u.getDef().equals(parent.sniper))  fighters.get(i).unit.attack(u, (short)0, parent.frame+500);
+            }
             if (fighters.get(i).unit.getDef().equals(parent.sniper)) {
-                float range = fighters.get(i).unit.getMaxRange();
+                float range = fighters.get(i).unit.getMaxRange()*0.92f  ;
+             
                 //parent.debug("rocko range: " + range);
                 List<Unit> nearby = parent.callback.getEnemyUnitsIn(fighters.get(i).unit.getPos(), range);
                 if (!nearby.isEmpty()) {
-                    parent.debug("rocko in combat");
+                    //parent.debug("rocko in combat");
                     float min = Float.MAX_VALUE;
                     Unit close = null;
                     for (Unit u : nearby) {
@@ -532,7 +538,7 @@ public class ThreatHandler {
                     pos.scale(1f / pos.length());
                     pos.scale(movedt);
                     pos.add(fighters.get(i).unit.getPos());
-                    //parent.callback.getMap().getDrawer().addPoint(pos,"rocko going here");
+                    //parent.label(pos,"rocko going here");
                     fighters.get(i).unit.moveTo(pos, (short) 0, 100);
                 } else {
                     Unit trg = getTarget(fighters.get(i).unit);
@@ -548,7 +554,7 @@ public class ThreatHandler {
 
                 List<Unit> nearby = parent.callback.getEnemyUnitsIn(fighters.get(i).unit.getPos(), 500);
                 if (!nearby.isEmpty()) {
-                    parent.debug("glaive in combat");
+                    //parent.debug("glaive in combat");
                     float min = Float.MAX_VALUE;
                     Unit close = null;
                     for (Unit u : nearby) {
@@ -560,17 +566,24 @@ public class ThreatHandler {
                     }
                     if (close != null) {
                         float range = close.getMaxRange();
-                        float movedt = 2 * range - (float) Math.sqrt(min);
+                        float movedt = 2.2f * range - (float) Math.sqrt(min);
                         AIFloat3 pos = new AIFloat3(fighters.get(i).unit.getPos());
                         pos.sub(close.getPos());
                         pos.scale(1f / pos.length());
                         pos.scale(movedt);
                         pos.add(fighters.get(i).unit.getPos());
-                        AIFloat3 vel = new AIFloat3(fighters.get(i).unit.getVel());
+                        AIFloat3 vel = new AIFloat3();
+                        for (Squad q : attackers){
+                            if (q.fighters.contains(fighters.get(i))){
+                                vel = new AIFloat3(q.target);
+                                vel.sub(fighters.get(i).unit.getPos());
+                                vel.normalize();
+                            }
+                        }
                         vel.scale(100);
                         pos.add(vel);
-                        //parent.callback.getMap().getDrawer().addPoint(pos,"rocko going here");
-                        fighters.get(i).unit.moveTo(pos, (short) 0, 100);
+                        //parent.label(pos,"rocko going here");
+                        if (Math.sqrt(min) < range*1.7) fighters.get(i).unit.moveTo(pos, (short) 0, 100);
                     }
                 } else {
                     /*
@@ -611,7 +624,7 @@ public class ThreatHandler {
                 }
             }
         }
-        if (parent.frame % 200 == 66) {
+        if (parent.frame % 100 == 66) {
             /*for (Squad q : defenders) {
              Unit trg = getTarget(q.getPos());
              if (trg != null && zkai.dist(q.getPos(), trg.getPos()) < 2000 * 2000 && parent.defense.getValue(trg.getPos()) / parent.defense.maxVal > 0.05) {
@@ -632,12 +645,16 @@ public class ThreatHandler {
             }
 
         }
-        if (parent.frame % 1600 == 80 && parent.builder.factories.size() > 0 && Area.getArea(parent.builder.factories.get(0).getPos()).fighters.size() + waiting.size() > 5) {
-            //aim bertha
+        if (parent.frame % 1600 == 64){
+             //aim bertha
+            
             for (Unit u : berthas) {
                 Area trg = Area.getArea(u.getPos()).closestOfOwner(Owner.enemy);
                 u.attackArea(trg.getCoords(), trg.getRadius(), (short) 0, parent.frame + 2000);
             }
+        }
+        if ((parent.frame % 16 == 8 ||parent.frame < 5000) && parent.builder.factories.size() > 0 && Area.getArea(parent.builder.factories.get(0).getPos()).fighters.size() + waiting.size() >= 5) {
+           
 
             //create new attack squad
             Area area = Area.getArea(parent.builder.factories.get(0).getPos());
@@ -697,7 +714,7 @@ public class ThreatHandler {
              }
              q.target = p;
 
-             //parent.callback.getMap().getDrawer().addPoint(p, "defending");
+             //parent.label(p, "defending");
              }*/
             for (Squad q : attackers) {
                 if (q.size() == 0) {
@@ -720,7 +737,7 @@ public class ThreatHandler {
                             q.clear();
                         }
                     }
-                    parent.callback.getMap().getDrawer().addPoint(q.target, "attacking");
+                    parent.label(q.target, "attacking");
                 }
             }
         }

@@ -626,8 +626,8 @@ public class BuilderHandler {
                 float maxh = -100;
                 Area best = null;
                 for (Area a : as) {
-                    if (a.getCenterHeight() > maxh) {
-                        maxh = a.getCenterHeight();
+                    if (Area.getHeight(a.getDefensePos(parent.bertha))> maxh) {
+                        maxh = Area.getHeight(a.getDefensePos(parent.bertha));
                         best = a;
                     }
                 }
@@ -642,8 +642,8 @@ public class BuilderHandler {
                 float maxh = -100;
                 Area best = null;
                 for (Area a : as) {
-                    if (a.getCenterHeight() > maxh) {
-                        maxh = a.getCenterHeight();
+                    if (Area.getHeight(a.getDefensePos(parent.bertha))> maxh) {
+                        maxh = Area.getHeight(a.getDefensePos(parent.bertha));
                         best = a;
                     }
                 }
@@ -704,20 +704,20 @@ public class BuilderHandler {
                             porcers++;
                         }
                     }
-                    if (Math.min(2, bertha) > parent.threats.berthas.size()) {
+                    if (Math.min(2, bertha) > parent.threats.berthas.size() && porcers < builders.size() / 2 && zkai.DEFENSES) {
                         parent.debug("planning on building bertha");
                         action = new Bertha(getBerthaArea(bertha), bertha);
 
-                    }
-                    if (porcers < builders.size() / 2 && zkai.DEFENSES) {
+                    }else
+                    if (porcers < builders.size() / 3.5f && zkai.DEFENSES) {
                         float best = -1;
                         Area besta = null;
                         for (Area a : Area.areas) {
                             if (a.owner != Owner.ally) {
                                 continue;
                             }
-                            float val = parent.threats.getDanger(a.getCoords());
-                            if (val > best && parent.defense.getDefense(a.getCoords()) * 3 < a.danger / 2 + parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
+                            float val = parent.threats.getDanger(a.getCoords()) * parent.rnd.nextFloat();
+                            if (val > best && a.isBorder() && parent.defense.getDefense(a.getCoords()) <Math.sqrt(a.danger)+ parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
                                 best = val;
                                 besta = a;
                             }
@@ -834,7 +834,7 @@ public class BuilderHandler {
                             parent.label(unit.getPos(), "mex");
 
                             if (!inRadarRange(action.getArea().getCoords())) {
-                                AIFloat3 pos = findClosestBuildPos(action.getArea().getCoords(), parent.radar);
+                                AIFloat3 pos = findClosestBuildPos(action.getArea().getDefensePos(parent.radar), parent.radar);
                                 build(pos, parent.radar, parent.frame + 700, lastOrderId++);
                                 virtualRadars.add(new Node((Build) order, parent.radar.getRadarRadius()));
                             } else {
@@ -890,7 +890,7 @@ public class BuilderHandler {
                         case porc:
                             parent.label(unit.getPos(), "porc");
                             parent.debug("porcing" + zkai.DEFENSES);
-                            if (parent.defense.getDefense(action.area.getCoords()) * 3 > action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
+                            if (parent.defense.getDefense(action.area.getCoords()) >=Math.sqrt(action.area.danger)+ parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
                                 parent.debug(parent.defense.getDefense(action.area.getCoords()) * 3 + " > " + (action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())));
                                 action = null;
 
@@ -903,7 +903,8 @@ public class BuilderHandler {
                                     }
                                 }
                                 if (assist == null) {
-                                    build(new Build(action.area.getCoords(), getDefenseTower(action.area.getCoords()), parent.frame + 2000, lastOrderId++));
+                                    UnitDef def = getDefenseTower(action.area.getCoords());
+                                    build(new Build(action.area.getDefensePos(def),def , parent.frame + 2000, lastOrderId++));
                                 } else {
                                     guard(assist.unit, parent.frame + 500, lastOrderId++);
                                 }
@@ -940,7 +941,7 @@ public class BuilderHandler {
                             if (assist != null) {
                                 guard(assist.unit, parent.frame + 2000, lastOrderId++);
                             } else {
-                                build(new Build(action.area.getCoords(), parent.bertha, parent.frame + 2000, lastOrderId++));
+                                build(new Build(action.area.getDefensePos(parent.bertha), parent.bertha, parent.frame + 2000, lastOrderId++));
                             }
                             break;
                         default:

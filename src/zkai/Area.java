@@ -6,11 +6,11 @@
 package zkai;
 
 import com.springrts.ai.oo.AIFloat3;
+import com.springrts.ai.oo.clb.UnitDef;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import zkai.ThreatHandler.Fighter;
@@ -36,10 +36,12 @@ public class Area {
 
     public Area(int x, int y) {
         owner = Owner.neutral;
+        
         this.x = x;
         this.y = y;
         fighters = parent.threats.new Squad();
         //parent.label(getCoords(), x + "|" + y);
+        
         parent.callback.getMap().getDrawer().addLine(getTopLeftCorner(), new AIFloat3(getTopLeftCorner().x, 0, getBottomRightCorner().z));
         parent.callback.getMap().getDrawer().addLine(getTopLeftCorner(), new AIFloat3(getBottomRightCorner().x, 0, getTopLeftCorner().z));
         parent.callback.getMap().getDrawer().addLine(getBottomRightCorner(), new AIFloat3(getTopLeftCorner().x, 0, getBottomRightCorner().z));
@@ -105,6 +107,9 @@ public class Area {
         float totDanger = 0;
         totUnits = 0;
         int totAreas = 0;
+        if (parent.frame % 2000 == 0){
+            heightmap = parent.callback.getMap().getHeightMap();
+        }
         for (Area a : areas) {
             if (a.owner != Owner.ally) {
                 continue;
@@ -127,7 +132,9 @@ public class Area {
             unitsUsed += a.guaranteedUnits;
             //a.guaranteedUnits += totUnits / 2 / totAreas;
         }
-        while (unitsUsed < totUnits) {
+        int blub = 0;
+        while (unitsUsed < totUnits && blub < 200) {
+            blub++;
             for (int i = 0; unitsUsed < totUnits && i < getAllied().size(); i++) {
                 if (getAllied().get(i).isBorder()) {
                     getAllied().get(i).guaranteedUnits++;
@@ -159,15 +166,53 @@ public class Area {
         }
         return res;
     }
+    
+    public AIFloat3 getDefensePos(UnitDef unitdef){
+        int w = 20;
+        int h = 20;
+        float best = -100;
+        AIFloat3 res = getCoords();
+        for (int x = 0; x < w; x++){
+            for (int y = 0; y < h; y ++){
+                AIFloat3 pos = new AIFloat3(getTopLeftCorner().x+x*getWidth()/w,0,getTopLeftCorner().z+y*getHeight()/h);
+                if (parent.callback.getMap().isPossibleToBuildAt(unitdef, pos, 0) && getHeight(pos) > best){
+                    best = getHeight(pos);
+                    res = pos;
+                }
+            }
+        }
+        return res;
+    }
 
     public void update() {
+        if (owner == Owner.enemy){
+            for (Area a : getNearbyAreas(1)) {
+                if (newlyCapped) {
+                    break;
+                }
+                if (a.getOwner() == Owner.neutral && parent.frame % 400 == 0 && parent.frame > 4000) {
+                    boolean dangerous = false;
+                    for (Area n : a.getNearbyAreas(1)) {
+                        if (n.owner == Owner.ally) {
+                            dangerous = true;
+                        }
+                    }
+                    if (!dangerous) {
+                        a.setOwner(Owner.enemy);
+                        a.newlyCapped = true;
+                        parent.debug("enemy expanding to " + a.x + "|" + a.y);
+                        break;
+                    }
+                }
+            }
+        }
         if (owner == Owner.ally) {
 
             for (Area a : getNearbyAreas(1)) {
                 if (newlyCapped) {
                     break;
                 }
-                if (a.getOwner() == Owner.neutral && parent.frame % 300 == 0 && !(parent.builder.factories.size() > 0
+                if (a.getOwner() == Owner.neutral && parent.frame % 300 == 0 && parent.frame > 3000 &&!(parent.builder.factories.size() > 0
                         && Area.getArea(parent.builder.factories.get(0).getPos()) == this && parent.frame < 4000 && getUnitcount() < 10)) {
                     boolean dangerous = false;
                     for (Area n : a.getNearbyAreas(1)) {
@@ -183,25 +228,7 @@ public class Area {
                     }
                 }
             }
-            for (Area a : getNearbyAreas(1)) {
-                if (newlyCapped) {
-                    break;
-                }
-                if (a.getOwner() == Owner.neutral && parent.frame % 750 == 0) {
-                    boolean dangerous = false;
-                    for (Area n : a.getNearbyAreas(1)) {
-                        if (n.owner == Owner.ally) {
-                            dangerous = true;
-                        }
-                    }
-                    if (!dangerous) {
-                        a.setOwner(Owner.enemy);
-                        a.newlyCapped = true;
-                        parent.debug("enemy expanding to " + a.x + "|" + a.y);
-                        break;
-                    }
-                }
-            }
+            
             int radius = 0;
             while (fighters.size() < guaranteedUnits) {
                 radius++;
@@ -226,7 +253,7 @@ public class Area {
                     } else if ((zkai.dist(f.unit.getPos(), getCoords())) < 0.25 * (getHeight() * getHeight() + getWidth() * getWidth())) {
                         f.unit.patrolTo(pt, (short) 0, parent.frame + 500);
                     } else {
-                        f.unit.moveTo(pt, (short) 0, parent.frame + 500);
+                        f.unit.fight(pt, (short) 0, parent.frame + 500);
                     }
                 }
             }
@@ -352,12 +379,15 @@ public class Area {
         return getHeight(getCoords());
     }
 
+    static List<Float> heightmap ;
+    
     static public float getHeight(AIFloat3 pos) {
-        return parent.callback.getMap().getHeightMap().get(Math.round(pos.z / 8) * parent.callback.getMap().getWidth() + Math.round(pos.x / 8));
+        return heightmap.get(Math.round(pos.z / 8) * parent.callback.getMap().getWidth() + Math.round(pos.x / 8));
     }
 
     static public void init(zkai p) {
         parent = p;
+        heightmap = parent.callback.getMap().getHeightMap();
         map = new Area[8][8];
         areas = new ArrayList();
         for (int x = 0; x < map.length; x++) {

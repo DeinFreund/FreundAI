@@ -193,7 +193,7 @@ public class ThreatHandler {
         if (unit.getDef() == null) {
             return true;
         }
-        return !(unit.getDef().getTooltip().contains("Riot") || unit.getDef().getTooltip().contains("Anti-Swarm"));
+        return !(unit.getDef().getTooltip().contains("Riot") || unit.getDef().getTooltip().contains("Anti-Swarm") || ( parent.frame < 10000 && unit.getDef().getName().contains("com")));
     }
 
     boolean hadriot = false;
@@ -517,6 +517,33 @@ public class ThreatHandler {
             for (Unit u : foes){
                 if (u.getDef().equals(parent.sniper))  fighters.get(i).unit.attack(u, (short)0, parent.frame+500);
             }
+            if (fighters.get(i).kind == Kind.assault || fighters.get(i).kind == Kind.raider) {
+
+                List<Unit> nearby = parent.callback.getEnemyUnitsIn(fighters.get(i).unit.getPos(), 500);
+                if (!nearby.isEmpty()) {
+                    //parent.debug("assault in combat");
+                    float min = Float.MAX_VALUE;
+                    Unit close = null;
+                    for (Unit u : nearby) {
+                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && u.getMaxRange() > 20 && (!u.getDef().isAbleToMove())) {
+                            min = zkai.dist(u.getPos(), fighters.get(i).unit.getPos());
+                            close = u;
+                        }
+                    }
+                    if (close != null) {
+                        fighters.get(i).unit.attack(close, (short) 0, 100);
+                    }
+                } else {
+                    /*
+                     float range = fighters.get(i).unit.getMaxRange();
+                     Unit trg = getTarget(fighters.get(i).unit);
+                    
+                     if (trg != null){
+                     float dist = (float)Math.sqrt(zkai.dist(fighters.get(i).unit.getPos(), trg.getPos()));
+                     if (dist < range*3) fighters.get(i).unit.attack(trg, (short)0, 300);
+                     }*/
+                }
+            }
             if (fighters.get(i).unit.getDef().equals(parent.sniper)) {
                 float range = fighters.get(i).unit.getMaxRange()*0.92f  ;
              
@@ -558,7 +585,8 @@ public class ThreatHandler {
                     float min = Float.MAX_VALUE;
                     Unit close = null;
                     for (Unit u : nearby) {
-                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && u.getDef().getTooltip().contains("Riot")
+                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && (u.getDef().getTooltip().contains("Riot")
+                                || ( parent.frame < 10000 && u.getDef().getName().contains("com")))
                                 && !(u.getHealth() / u.getMaxHealth() < 0.2) && !u.isBeingBuilt()) {
                             min = zkai.dist(u.getPos(), fighters.get(i).unit.getPos());
                             close = u;
@@ -596,33 +624,7 @@ public class ThreatHandler {
                      }*/
                 }
             }
-            if (fighters.get(i).kind == Kind.assault || fighters.get(i).kind == Kind.raider) {
-
-                List<Unit> nearby = parent.callback.getEnemyUnitsIn(fighters.get(i).unit.getPos(), 500);
-                if (!nearby.isEmpty()) {
-                    parent.debug("assault in combat");
-                    float min = Float.MAX_VALUE;
-                    Unit close = null;
-                    for (Unit u : nearby) {
-                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && u.getMaxRange() > 20 && (!u.getDef().isAbleToMove())) {
-                            min = zkai.dist(u.getPos(), fighters.get(i).unit.getPos());
-                            close = u;
-                        }
-                    }
-                    if (close != null) {
-                        fighters.get(i).unit.attack(close, (short) 0, 100);
-                    }
-                } else {
-                    /*
-                     float range = fighters.get(i).unit.getMaxRange();
-                     Unit trg = getTarget(fighters.get(i).unit);
-                    
-                     if (trg != null){
-                     float dist = (float)Math.sqrt(zkai.dist(fighters.get(i).unit.getPos(), trg.getPos()));
-                     if (dist < range*3) fighters.get(i).unit.attack(trg, (short)0, 300);
-                     }*/
-                }
-            }
+            
         }
         if (parent.frame % 100 == 66) {
             /*for (Squad q : defenders) {

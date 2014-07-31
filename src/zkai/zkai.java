@@ -26,7 +26,7 @@ import zkai.BuilderHandler.Order;
  */
 public class zkai extends com.springrts.ai.oo.AbstractOOAI {
 
-    public static final boolean DEFENSES = false;    
+    public static final boolean DEFENSES = true;    
     
     List<Unit> builders = new ArrayList();
     List<Unit> fighters = new ArrayList();
@@ -176,6 +176,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
 
     @Override
     public int init(int teamId, OOAICallback callback) {
+        
         try {
             this.callback = callback;
             List<UnitDef> unitDefs = this.callback.getUnitDefs();
@@ -644,7 +645,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                             pendingNano = true;
                         }
                     }//fighters.size() < 10 ||
-                    if ((frame < 10000 && builder.builders.size() > 1) || builder.builders.size() > (int) (callback.getEconomy().getIncome(BuilderHandler.metal) / 5)) {
+                    if ((frame < 10000 && builder.builders.size() > 1) || builder.builders.size() > (int) Math.sqrt(callback.getEconomy().getIncome(BuilderHandler.metal)*0.8)) {
 
                         fac.build(threats.getNeededUnit(), fac.getPos(), 0, (short) 4, Integer.MAX_VALUE);
 

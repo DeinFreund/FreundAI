@@ -40,9 +40,12 @@ public class BuilderHandler {
     float reserveEnergy = 2;
     static Resource metal, energy;
 
+    float antiAirMult = 1;
+
     TreeMap<Integer, Float> pylonrange;
 
     int lastOrderId = 0;
+    int antinukes = 0;
 
     public BuilderHandler(zkai parent) {
         this.parent = parent;
@@ -192,6 +195,12 @@ public class BuilderHandler {
         if (u.getDef().equals(parent.hlt)) {
             buildings.add(u);
         }
+        if (u.getDef().equals(parent.razor)) {
+            buildings.add(u);
+        }
+        if (u.getDef().equals(parent.bertha)) {
+            buildings.add(u);
+        }
         if (u.getDef().getName().contains("factory")) {
             buildings.add(u);
         }
@@ -245,10 +254,13 @@ public class BuilderHandler {
     int bertha = 0;
 
     public UnitDef getDefenseTower(AIFloat3 pos) {
-        if (parent.defense.getDefense(pos) > 3000) {
-            bertha++;
+        if (parent.defense.getDefense(pos) * antiAirMult > 200 && parent.rnd.nextInt(3)== 0) {
+            return parent.razor;
         }
-        if (parent.defense.getDefense(pos) > 300) {
+        if (parent.defense.getDefense(pos) * antiAirMult > 100 && parent.defense.getDefense(pos) < 300 ) {
+            return parent.razor;
+        }
+        if (parent.defense.getDefense(pos) > 300 ) {
             return parent.hlt;
         }
         if (parent.defense.getValue(pos) / parent.defense.maxVal > 0.42 || parent.defense.getDefense(pos) > 200) {
@@ -376,7 +388,15 @@ public class BuilderHandler {
         energyUnderConstruction /= 1.002;
         energyUnderConstruction = Math.max(energyUnderConstruction, 0);
         reserveEnergy *= 1.00008;
-        if (parent.frame % 30000 == 0 && Area.getAllied().size() > 0.2*Area.areas.size()) bertha ++;
+        if (parent.frame % 37000 == 0 && Area.getAllied().size() > 0.2 * Area.areas.size()) {
+          
+            antinukes++;
+        }  
+        if (parent.frame % 30000 == 0 && Area.getAllied().size() > 0.2 * Area.areas.size()) {
+            bertha++;
+        } else if (parent.frame % 15000 == 0 && Area.getAllied().size() > 0.7 * Area.areas.size()) {
+            bertha++;
+        }
         if (parent.frame % 100 == 0) {
             parent.debug("Energy under construction: " + energyUnderConstruction);
 
@@ -619,14 +639,14 @@ public class BuilderHandler {
     List<Area> berthaAreas = new ArrayList();
 
     Area getBerthaArea(int index) {
-        if (index > berthaAreas.size()) {
+        while (index > berthaAreas.size()) {
             if (index == 1) {
                 List<Area> as = Area.getArea(factories.get(0).getPos()).getNearbyAreas(1);
                 as.add(Area.getArea(factories.get(0).getPos()));
                 float maxh = -100;
                 Area best = null;
                 for (Area a : as) {
-                    if (Area.getHeight(a.getDefensePos(parent.bertha))> maxh) {
+                    if (Area.getHeight(a.getDefensePos(parent.bertha)) > maxh) {
                         maxh = Area.getHeight(a.getDefensePos(parent.bertha));
                         best = a;
                     }
@@ -642,7 +662,7 @@ public class BuilderHandler {
                 float maxh = -100;
                 Area best = null;
                 for (Area a : as) {
-                    if (Area.getHeight(a.getDefensePos(parent.bertha))> maxh) {
+                    if (Area.getHeight(a.getDefensePos(parent.bertha)) > maxh) {
                         maxh = Area.getHeight(a.getDefensePos(parent.bertha));
                         best = a;
                     }
@@ -651,6 +671,21 @@ public class BuilderHandler {
             }
         }
         return berthaAreas.get(index - 1);
+    }
+
+    List<Area> antinukeAreas = new ArrayList();
+
+    Area getAntinukeArea(int index) {
+        if (index > antinukeAreas.size()) {
+            if (parent.threats.antinukes.isEmpty()) {
+                antinukeAreas.add(Area.getArea(factories.get(0).getPos()));
+
+            } else {
+
+                antinukeAreas.add(Area.getAllied().get(parent.rnd.nextInt(Area.getAllied().size())));
+            }
+        }
+        return antinukeAreas.get(index - 1);
     }
 
     final class Builder {
@@ -684,17 +719,20 @@ public class BuilderHandler {
                         }
                     }
                 }
-                if (action == null && parent.frame > 1000 && (parent.callback.getEconomy().getCurrent(energy)
-                        > 380)
-                        && parent.callback.getEconomy().getCurrent(metal) > 150) {
-                    boolean possible = true;
-                    for (Builder b : builders) {
-                        if (b.action != null && b.action.getAction() == Actions.buildFactory) {
-                            possible = false;
-                        }
+                boolean possible = true;
+                for (Builder b : builders) {
+                    if (b.action != null && b.action.getAction() == Actions.buildFactory) {
+                        possible = false;
                     }
-                    if (possible) {
+                }
+                if (action == null && parent.frame > 3000 && (parent.callback.getEconomy().getCurrent(energy)
+                        > 380) && parent.callback.getEconomy().getCurrent(metal) > 150 && factories.size() > 0
+                        && possible) {
+
+                    if (zkai.dist(unit.getPos(), factories.get(0).getPos()) < 500 * 500) {
                         action = new BuildFactory(Area.getArea(factories.get(0).getPos()));
+                    } else {
+                        parent.requestConstructor();
                     }
                 }
                 if (action == null) {
@@ -704,12 +742,15 @@ public class BuilderHandler {
                             porcers++;
                         }
                     }
-                    if (Math.min(2, bertha) > parent.threats.berthas.size() && porcers < builders.size() / 2 && zkai.DEFENSES) {
+                    if (antinukes > parent.threats.antinukes.size() && porcers < builders.size() / 2 && zkai.DEFENSES) {
+                        parent.debug("planning on building antinuke");
+                        action = new Antinuke(getAntinukeArea(antinukes), antinukes);
+
+                    } else if (bertha > parent.threats.berthas.size() && porcers < builders.size() / 2 && zkai.DEFENSES) {
                         parent.debug("planning on building bertha");
                         action = new Bertha(getBerthaArea(bertha), bertha);
 
-                    }else
-                    if (porcers < builders.size() / 3.5f && zkai.DEFENSES) {
+                    } else if (porcers < builders.size() / 5f && zkai.DEFENSES && parent.frame > 32000 / antiAirMult) {
                         float best = -1;
                         Area besta = null;
                         for (Area a : Area.areas) {
@@ -717,7 +758,7 @@ public class BuilderHandler {
                                 continue;
                             }
                             float val = parent.threats.getDanger(a.getCoords()) * parent.rnd.nextFloat();
-                            if (val > best && a.isBorder() && parent.defense.getDefense(a.getCoords()) <Math.sqrt(a.danger)+ parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
+                            if (val > best && a.isBorder() && parent.defense.getDefense(a.getCoords())*3 < Math.sqrt(a.danger) + parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
                                 best = val;
                                 besta = a;
                             }
@@ -729,10 +770,12 @@ public class BuilderHandler {
                     }
                 }
                 //parent.debug("would upgrade energy: " + String.valueOf(parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction < parent.callback.getEconomy().getUsage(energy) + reserveEnergy));
-                
+
                 int ebuilders = 0;
-                for (Builder b : builders){
-                    if (b.action != null && b.action.getAction() == Actions.buildEnergy) ebuilders++;
+                for (Builder b : builders) {
+                    if (b.action != null && b.action.getAction() == Actions.buildEnergy) {
+                        ebuilders++;
+                    }
                 }
                 if (action == null && (!(parent.frame < 5000) || ebuilders == 0) && parent.frame > 500
                         && ((parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction < parent.callback.getEconomy().getUsage(energy)
@@ -745,7 +788,7 @@ public class BuilderHandler {
                         if (a.getOwner() != Owner.ally) {
                             continue;
                         }
-                        Build b = upgradeEnergy(a,parent.solar);
+                        Build b = upgradeEnergy(a, parent.solar);
                         float dist = zkai.dist(a.getCoords(), unit.getPos());
                         if (b.getPosition().x < 0 && dist < bestsimple) {
                             bestsimple = dist;
@@ -867,30 +910,45 @@ public class BuilderHandler {
                                 action = null;
                             } else {
                                 Unit rep = null;
-                                for (Unit u : parent.callback.getFriendlyUnitsIn(unit.getPos(), 500)){
-                                    if (u.isBeingBuilt() && pylonrange.containsKey(u.getDef().getUnitDefId())){
+                                for (Unit u : parent.callback.getFriendlyUnitsIn(unit.getPos(), 500)) {
+                                    if (u.isBeingBuilt() && pylonrange.containsKey(u.getDef().getUnitDefId())) {
                                         rep = u;
                                     }
                                 }
-                                if (rep == null){
+                                Builder assist = null;
+                                for (Builder b : builders) {
+                                    if (b.equals(this)) {
+                                        continue;
+                                    }
+                                    if (b.action != null && b.action.getAction() == Actions.buildEnergy && b.action.getArea() == action.getArea()
+                                            &&b.order != null &&b.order.id < 0) {
+                                        assist = b;
+                                    }
+                                }
+                                if (assist != null) {
+                                    ((BuildEnergy) assist.action).amount += ((BuildEnergy) action).amount;
+
+                                    ((BuildEnergy) action).amount = 0;
+                                    guard(assist.unit, 300 * (int) ((BuildEnergy) assist.action).amount, lastOrderId++);
+                                } else if (rep == null) {
                                     UnitDef def;
-                                    if (parent.callback.getEconomy().getIncome(energy) > 100){
+                                    if (parent.callback.getEconomy().getIncome(energy) > 100) {
                                         def = parent.fusion;
                                         ((BuildEnergy) action).amount -= 35;
-                                    }else{
+                                    } else {
                                         def = parent.solar;
                                         ((BuildEnergy) action).amount -= 2;
                                     }
                                     build(upgradeEnergy(action.getArea(), def));
-                                }else{
-                                    repair(rep, parent.frame + 800 , lastOrderId++);
+                                } else {
+                                    repair(rep, parent.frame + 800, lastOrderId++);
                                 }
                             }
                             break;
                         case porc:
                             parent.label(unit.getPos(), "porc");
                             parent.debug("porcing" + zkai.DEFENSES);
-                            if (parent.defense.getDefense(action.area.getCoords()) >=Math.sqrt(action.area.danger)+ parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
+                            if (parent.defense.getDefense(action.area.getCoords())*3 >= Math.sqrt(action.area.danger) + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
                                 parent.debug(parent.defense.getDefense(action.area.getCoords()) * 3 + " > " + (action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())));
                                 action = null;
 
@@ -904,7 +962,7 @@ public class BuilderHandler {
                                 }
                                 if (assist == null) {
                                     UnitDef def = getDefenseTower(action.area.getCoords());
-                                    build(new Build(action.area.getDefensePos(def),def , parent.frame + 2000, lastOrderId++));
+                                    build(new Build(action.area.getDefensePos(def), def, parent.frame + 2000, lastOrderId++));
                                 } else {
                                     guard(assist.unit, parent.frame + 500, lastOrderId++);
                                 }
@@ -931,6 +989,10 @@ public class BuilderHandler {
                         case bertha:
                             parent.debug("building bertha");
                             Bertha bb = (Bertha) action;
+                            if (bb.index <= parent.threats.berthas.size()) {
+                                action = null;
+                                break;
+                            }
                             Builder assist = null;
                             for (Builder b : builders) {
                                 if (b.action != null && b.action.getAction() == Actions.bertha && ((Bertha) b.action).index == bb.index
@@ -939,9 +1001,29 @@ public class BuilderHandler {
                                 }
                             }
                             if (assist != null) {
-                                guard(assist.unit, parent.frame + 2000, lastOrderId++);
+                                guard(assist.unit, parent.frame + 500, lastOrderId++);
                             } else {
                                 build(new Build(action.area.getDefensePos(parent.bertha), parent.bertha, parent.frame + 2000, lastOrderId++));
+                            }
+                            break;
+                        case antinuke:
+                            parent.debug("building antinuke");
+                            if (antinukes <= parent.threats.antinukes.size()) {
+                                action = null;
+                                break;
+                            }
+                            Antinuke an = (Antinuke) action;
+                            Builder ass = null;
+                            for (Builder b : builders) {
+                                if (b.action != null && b.action.getAction() == Actions.antinuke && ((Antinuke) b.action).index == an.index
+                                        && b.order != null && b.order.id < 0) {
+                                    ass = b;
+                                }
+                            }
+                            if (ass != null) {
+                                guard(ass.unit, parent.frame + 500, lastOrderId++);
+                            } else {
+                                build(new Build(action.area.getCoords(), parent.antinuke, parent.frame + 2000, lastOrderId++));
                             }
                             break;
                         default:
@@ -975,7 +1057,7 @@ public class BuilderHandler {
                 parent.label(unit.getPos(), "order timed out");
                 idle();
             }
-            if (!(parent.threats.getValue(unit.getPos(), 600)== 0) && (order == null
+            if (!(parent.threats.getValue(unit.getPos(), 600) == 0) && (order == null
                     || zkai.dist(unit.getPos(), order.getPosition()) > 150 * 150)) {
 
                 if (order != null && order.id < 0) {
@@ -1313,6 +1395,20 @@ public class BuilderHandler {
         }
     }
 
+    class Antinuke extends Action {
+
+        int index;
+        public Antinuke(Area a, int index) {
+            area = a;
+            this.index = index;
+        }
+
+        @Override
+        public Actions getAction() {
+            return Actions.antinuke;
+        }
+    }
+
     abstract class Action {
 
         public boolean equals(Action o) {
@@ -1331,6 +1427,6 @@ public class BuilderHandler {
 
     enum Actions {
 
-        reclaim, repair, buildFactory, buildMexes, buildEnergy, porc, bertha;
+        reclaim, repair, buildFactory, buildMexes, buildEnergy, porc, bertha, antinuke;
     }
 }

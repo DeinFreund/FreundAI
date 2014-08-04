@@ -114,7 +114,7 @@ public class Area {
             if (a.owner != Owner.ally) {
                 continue;
             }
-            totDanger += (parent.threats.getValue(a.getCoords(), a.getRadius()) + 20) * (a.getOwner() == Owner.contested ? 2 : 1) * (a.getMexes().isEmpty() ? 1 : 1.5);
+            totDanger += (parent.threats.getValue(a.getCoords(), a.getRadius()) + 20) * (a.getOwner() == Owner.contested ? 2 : 1)* (a.isBorder() ? 4 : 1) * (a.getMexes().isEmpty() ? 1 : 1.5);
             totAreas++;
             totUnits += a.fighters.size();
         }
@@ -127,13 +127,13 @@ public class Area {
                 a.guaranteedUnits = 0;
                 continue;
             }
-            a.guaranteedUnits = (int) (((20 + parent.threats.getValue(a.getCoords(), a.getRadius()))) * (a.getOwner() == Owner.contested ? 2 : 1)
+            a.guaranteedUnits = (int) (((20 + parent.threats.getValue(a.getCoords(), a.getRadius()))) * (a.getOwner() == Owner.contested ? 2 : 1)* (a.isBorder() ? 4 : 1)
                     * (a.getMexes().isEmpty() ? 1 : 1.5) / totDanger * totUnits);
             unitsUsed += a.guaranteedUnits;
             //a.guaranteedUnits += totUnits / 2 / totAreas;
         }
         int blub = 0;
-        while (unitsUsed < totUnits && blub < 200) {
+        while (unitsUsed < totUnits && blub < 100) {
             blub++;
             for (int i = 0; unitsUsed < totUnits && i < getAllied().size(); i++) {
                 if (getAllied().get(i).isBorder()) {
@@ -247,7 +247,7 @@ public class Area {
                 }
                 for (Fighter f : fighters.fighters) {
                     AIFloat3 pt = new AIFloat3(parent.rnd.nextFloat() * getWidth() + getWidth() * x, 0, parent.rnd.nextFloat() * getHeight() + getHeight() * y);
-                    if (Math.sqrt(zkai.dist(getCoords(), threat)) < getRadius() * 5 && (Area.getArea(threat).owner == Owner.ally ||
+                    if (threat.x > 0 && Math.sqrt(zkai.dist(getCoords(), threat)) < getRadius() * 5 && (Area.getArea(threat).owner == Owner.ally ||
                             parent.threats.getDanger(threat) / parent.threats.maxval < 0.3)) {
                         f.unit.fight(threat, (short) 0, parent.frame + 500);
                     } else if ((zkai.dist(f.unit.getPos(), getCoords())) < 0.25 * (getHeight() * getHeight() + getWidth() * getWidth())) {
@@ -283,6 +283,8 @@ public class Area {
         }
         if (parent.threats.getStaticValue(getCoords(), getRadius()) > 0) {
             owner = Owner.enemy;
+            
+            //parent.debug("enemy owns " + x + "|" + y + " because statics");
         }
         if (owner != Owner.ally && fighters.size() > 0) {
             float best = Float.MAX_VALUE;
@@ -308,7 +310,7 @@ public class Area {
     public AIFloat3 getCoords() {
         float xx = parent.callback.getMap().getWidth() * 8 * (x + 0.5f) / map.length;
         float yy = parent.callback.getMap().getHeight() * 8 * (y + 0.5f) / map[x].length;
-        return new AIFloat3(xx, 0, yy);
+        return new AIFloat3(xx, getHeight(new AIFloat3(xx,0,yy)), yy);
     }
 
     public float getWidth() {
@@ -346,7 +348,21 @@ public class Area {
     public int gridDistance(Area other) {
         return Math.max(Math.abs(x - other.x), Math.abs(y - other.y));
     }
+    
+    public Area farthestOfOwner(Owner o,AIFloat3 pt, float maxdist) {
+        float best = 0;
+        maxdist *= maxdist;
+        Area besta = null;
+        for (Area a : Area.areas) {
+            float dist = a.gridDistance(this) + parent.rnd.nextFloat();
+            if (dist > best && a.owner == o && zkai.dist(a.getCoords(), pt) < maxdist) {
+                best = dist;
+                besta = a;
+            }
+        }
+        return besta;
 
+    }
     public Area closestOfOwner(Owner o) {
         int best = Integer.MAX_VALUE;
         Area besta = null;
@@ -366,7 +382,7 @@ public class Area {
         List<AIFloat3> res = new ArrayList();
         for (AIFloat3 m : parent.availablemetalspots) {
             if (m.x >= c1.x && m.z >= c1.z && m.x < c2.x && m.z < c2.z
-                    && zkai.dist(parent.callback.getMap().findClosestBuildSite(parent.mex, m, 800, 0, 0), m) < 100) {
+                    && (parent.callback.getMap().isPossibleToBuildAt(parent.mex, m, 0))) {
                 res.add(m);
             }
         }

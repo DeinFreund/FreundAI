@@ -181,6 +181,7 @@ public class Area {
                 }
             }
         }
+        res.y = getHeight(res);
         return res;
     }
 
@@ -197,6 +198,7 @@ public class Area {
                             dangerous = true;
                         }
                     }
+                    if (parent.callback.getFriendlyUnitsIn(a.getCoords(), a.getRadius()).size() > 0) dangerous = true;
                     if (!dangerous) {
                         a.setOwner(Owner.enemy);
                         a.newlyCapped = true;
@@ -212,8 +214,8 @@ public class Area {
                 if (newlyCapped) {
                     break;
                 }
-                if (a.getOwner() == Owner.neutral && parent.frame % 300 == 0 && parent.frame > 3000 &&!(parent.builder.factories.size() > 0
-                        && Area.getArea(parent.builder.factories.get(0).getPos()) == this && parent.frame < 4000 && getUnitcount() < 10)) {
+                if (a.getOwner() == Owner.neutral && parent.frame % 300 == 0 && parent.frame > 500 &&!(parent.builder.factories.size() > 0
+                        && Area.getArea(parent.builder.factories.get(0).getPos()) == this && parent.frame < 4000 && getUnitcount() < 10 && parent.threats.squadSent)) {
                     boolean dangerous = false;
                     for (Area n : a.getNearbyAreas(1)) {
                         if (n.owner == Owner.enemy) {
@@ -247,8 +249,8 @@ public class Area {
                 }
                 for (Fighter f : fighters.fighters) {
                     AIFloat3 pt = new AIFloat3(parent.rnd.nextFloat() * getWidth() + getWidth() * x, 0, parent.rnd.nextFloat() * getHeight() + getHeight() * y);
-                    if (threat.x > 0 && Math.sqrt(zkai.dist(getCoords(), threat)) < getRadius() * 5 && (Area.getArea(threat).owner == Owner.ally ||
-                            parent.threats.getDanger(threat) / parent.threats.maxval < 0.3)) {
+                    if (threat.x > 0 && Math.sqrt(zkai.dist(getCoords(), threat)) < getRadius() * 5 && (Area.getArea(threat).owner == Owner.ally ||(
+                            parent.threats.getDanger(threat) / parent.threats.maxval < 0.3 && Area.getArea(threat).owner == Owner.neutral))) {
                         f.unit.fight(threat, (short) 0, parent.frame + 500);
                     } else if ((zkai.dist(f.unit.getPos(), getCoords())) < 0.25 * (getHeight() * getHeight() + getWidth() * getWidth())) {
                         f.unit.patrolTo(pt, (short) 0, parent.frame + 500);

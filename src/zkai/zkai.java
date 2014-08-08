@@ -90,17 +90,26 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
         return 0;
     }
     
+    public int unitGiven(Unit unit, int oldTeamId, int newTeamId) {
+        unitFinished(unit);
+        return 0;
+    }
+    
     public int unitDamaged(Unit unit, Unit attacker, float damage, AIFloat3 dir, WeaponDef weaponDef, boolean paralyzer) {
-        Area.getArea(unit.getPos()).lastAttack = frame;
-        Area.getArea(unit.getPos()).danger += damage;
-        if (attacker == null || attacker.getUnitId() < 0) {
-            
-            threats.addPoint(unit.getPos(), damage);
-        } else {
-            if (attacker.getAllyTeam() == team) {
-                debug("damage added friend");
+        try {
+            Area.getArea(unit.getPos()).lastAttack = frame;
+            Area.getArea(unit.getPos()).danger += damage;
+            if (attacker == null || attacker.getUnitId() < 0) {
+                
+                threats.addPoint(unit.getPos(), damage);
+            } else {
+                if (attacker.getAllyTeam() == team) {
+                    debug("damage added friend");
+                }
+                threats.addUnit(attacker, damage);
             }
-            threats.addUnit(attacker, damage);
+        } catch (Exception ex) {
+            printException(ex);
         }
         //debug("was damaged " + damage);
         return 0;
@@ -108,24 +117,24 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     
     public int enemyEnterLOS(Unit enemy) {
         try {
-        if (enemy.getAllyTeam() == team) {
-            debug("enterlos added friend");
-        }
-        
-        if (enemy.getMaxSpeed() < 0.5 || enemy.getDef().getMaxAcceleration() == 0) {
-            //found building
-            Area.getArea(enemy.getPos()).setOwner(Owner.enemy);
-        }
-        threats.addUnit(enemy, -1);
-        }catch(Exception ex){
+            if (enemy.getAllyTeam() == team) {
+                debug("enterlos added friend");
+            }
+            
+            if (enemy.getMaxSpeed() < 0.5 || enemy.getDef().getMaxAcceleration() == 0) {
+                //found building
+                Area.getArea(enemy.getPos()).setOwner(Owner.enemy);
+            }
+            threats.addUnit(enemy, -1);
+        } catch (Exception ex) {
             printException(ex);
         }
         return 0;
     }
     
     public int enemyLeaveLOS(Unit enemy) {
-        threats.removeUnit(enemy, false);
-        debug(enemy.getDef().getHumanName() + " left LOS");
+        //threats.removeUnit(enemy, false);
+        //debug(enemy.getDef().getHumanName() + " left LOS");
         return 0;
     }
     
@@ -149,7 +158,11 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     }
     
     public int enemyLeaveRadar(Unit enemy) {
-        threats.removeUnit(enemy, false);
+        try {
+            threats.removeUnit(enemy, false);
+        } catch (Exception e) {
+            printException(e);
+        }
         //debug(enemy.getDef().getHumanName() + " left radar");
         return 0;
     }
@@ -230,7 +243,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                 }
                 if (def.getName().equals("armsnipe")) {
                     sniper = def;
-                    debug("found rector");
+                    debug("found sniper");
                 }
                 if (def.getName().equals("armpw")) {
                     glaive = def;
@@ -316,6 +329,13 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
             return Float.MAX_VALUE;
         }
         return (float) (Math.pow(a.x - b.x, 2) + Math.pow(a.z - b.z, 2)); //+ Math.pow(a.y - b.y, 2)
+    }
+    
+    public static float dist3d(AIFloat3 a, AIFloat3 b) {
+        if (a == null || b == null) {
+            return Float.MAX_VALUE;
+        }
+        return (float) (Math.pow(a.x - b.x, 2) + Math.pow(a.z - b.z, 2) + Math.pow(a.y - b.y, 2)); //+ Math.pow(a.y - b.y, 2)
     }
     
     public Unit closestUnitToRepair(Unit unit) {
@@ -670,7 +690,7 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                 defense.pnl.updateUI();
                 defense.pnl2.updateUI();
             }
-            if (frame % 15 == 0 || facidle) {
+            if (frame % 55 == 0 || facidle) {
                 if (fac != null && fac.getCurrentCommands().isEmpty()) {
                     boolean pendingNano = false;
                     for (Order o : builder.pending) {
@@ -706,7 +726,9 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
     }
     
     public void debug(String s) {
-        callback.getGame().sendTextMessage( s, callback.getGame().getMyTeam());
+        if (s.contains("Exception") || frame < 1000) {
+            callback.getGame().sendTextMessage(s, callback.getGame().getMyTeam());
+        }
     }
     
     public void label(AIFloat3 pos, String s) {
@@ -767,6 +789,9 @@ public class zkai extends com.springrts.ai.oo.AbstractOOAI {
                 //com.build(cloaky, callback.getMap().findClosestBuildSite(cloaky, com.getPos(), 50f, 0, 0), 0, (short)0, Integer.MAX_VALUE);
             } else if (unit.getDef().isAbleToMove()) {
                 facidle = true;
+                if (builder.factories.size() > 0) {
+                    builder.factories.get(0).stop((short) 0, frame + 10);
+                }
             }
             if (unit.getDef().getName().equals("armpw")) {
                 

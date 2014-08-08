@@ -39,6 +39,8 @@ public class ThreatHandler {
     List<Unit> antinukes;
     int groupsize = 5;
     float airvalue = 0;
+    AIFloat3 maxcoords;
+    boolean squadSent = false;
 
     public ThreatHandler(zkai parent) {
         this.parent = parent;
@@ -65,7 +67,7 @@ public class ThreatHandler {
     public void removeUnit(Unit unit, boolean killed) {
         //parent.debug("removing " + unit.getDef().getHumanName());
         for (Enemy e : enemies) {
-            if (e.unit.equals(unit)) {
+            if (e.unit != null && e.unit.equals(unit)) {
                 if (!killed) {
                     addPoint(unit.getPos(), e.value);
                 }
@@ -229,8 +231,8 @@ public class ThreatHandler {
     }
 
     public UnitDef getNeededUnit() {
-        if (parent.rnd.nextBoolean() && airvalue > 0) {
-            airvalue -= parent.gremlin.getCost(BuilderHandler.metal) * 3;
+        if (parent.rnd.nextInt(3)==0 && airvalue > 0) {
+            airvalue -= parent.gremlin.getCost(BuilderHandler.metal) * 15;
             return parent.gremlin;
         }
         int glaive = 1;
@@ -256,15 +258,16 @@ public class ThreatHandler {
         if (enemyHasRiot() && parent.frame < 10000 && ownr < 5) {
             return parent.rocko;
         }
-        if (glaive / (float) rocko > owng / (float) ownr || (owng < 7 && !enemyHasRiot())) {
+        if ((parent.rnd.nextInt(3) < 2&&glaive / (float) rocko > owng / (float) ownr) || (owng < 7 && !enemyHasRiot())) {
+            if (parent.frame > 10000 && parent.rnd.nextInt(3) == 0) return parent.zeus;
             return parent.glaive;
         }
         switch (parent.rnd.nextInt(14)) {
             case 0:
+            case 1:
                 if (fighters.size() > 10) {
                     return parent.sniper;
                 }
-            case 1:
             case 2:
             case 3:
             case 4:
@@ -363,7 +366,7 @@ public class ThreatHandler {
                     if (q.fighters.contains(f)) {
                         q.fighters.remove(f);
                     }
-                } 
+                }
                 for (Squad q : attackers) {
                     if (q.fighters.contains(f)) {
                         q.fighters.remove(f);
@@ -563,7 +566,8 @@ public class ThreatHandler {
                     float min = Float.MAX_VALUE;
                     Unit close = null;
                     for (Unit u : nearby) {
-                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && u.getMaxRange() > 20 && (!u.getDef().isAbleToMove())) {
+                        if (u.getDef() != null && zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && u.getMaxRange() > 20 &&
+                                (!u.getDef().isAbleToMove()) && !u.getDef().equals(parent.razor) ) {
                             min = zkai.dist(u.getPos(), fighters.get(i).unit.getPos());
                             close = u;
                         }
@@ -581,7 +585,7 @@ public class ThreatHandler {
                             }
                         }
                         if (close != null) {
-                            if (zkai.dist(fighters.get(i).unit.getPos(), close.getPos()) < 200) {
+                            if (zkai.dist(fighters.get(i).unit.getPos(), close.getPos()) < 200 * 200 && close.getHealth()/close.getMaxHealth() < 0.1) {
 
                                 fighters.get(i).unit.moveTo(randomizeCircle(close.getPos(), fighters.get(i).unit.getUnitId(), 150,
                                         fighters.get(i).unit.getDef().getSpeed()), (short) 0, 100);
@@ -606,7 +610,7 @@ public class ThreatHandler {
                      }*/
                 }
             }
-            if (fighters.get(i).unit.getDef().equals(parent.sniper)) {
+            if (fighters.get(i).unit.getDef()!= null && fighters.get(i).unit.getDef().equals(parent.sniper)) {
                 float range = fighters.get(i).unit.getMaxRange() * 0.85f;
 
                 //parent.debug("rocko range: " + range);
@@ -647,7 +651,7 @@ public class ThreatHandler {
                     float min = Float.MAX_VALUE;
                     Unit close = null;
                     for (Unit u : nearby) {
-                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && (u.getDef().getTooltip().contains("Riot")
+                        if (zkai.dist(u.getPos(), fighters.get(i).unit.getPos()) < min && (!isRaidable(u)
                                 || (parent.frame < 10000 && (u.getDef().getName().contains("com") || u.getDef().getTooltip().contains("Assault"))))
                                 && !(u.getHealth() / u.getMaxHealth() < 0.2) && !u.isBeingBuilt()) {
                             min = zkai.dist(u.getPos(), fighters.get(i).unit.getPos());
@@ -688,7 +692,11 @@ public class ThreatHandler {
                      }*/
                 }
             }
-
+            if (parent.builder.factories.size() > 0 && zkai.dist(fighters.get(i).unit.getPos(), parent.builder.factories.get(0).getPos()) < 100*100){
+                AIFloat3 p = new AIFloat3(parent.builder.factories.get(0).getPos());
+                p.z+=250;
+                fighters.get(i).unit.moveTo(p, (short)0, parent.frame +300);
+            }
         }
         if (parent.frame % 100 == 66) {
             /*for (Squad q : defenders) {
@@ -710,7 +718,8 @@ public class ThreatHandler {
                 }
             }
             Unit trg = getTarget(waiting.getPos());
-            if (trg != null && (zkai.dist(waiting.target, trg.getPos()) < 1200 * 1200)
+            parent.debug("waiting target at: " + waiting.target.x + "|" + waiting.target.z);
+            if (trg != null && (zkai.dist(waiting.target, trg.getPos()) < 600 * 600)
                     && !(waiting.isRaiderSquad() && !isRaidable(trg))) {
                 waiting.fight(trg.getPos());
             } else {
@@ -718,29 +727,44 @@ public class ThreatHandler {
             }
 
         }
-        if (parent.frame % 400 == 64) {
+        if (parent.frame % 30 == 14) {
             //aim bertha
 
             for (Unit u : berthas) {
-                float mindist = Float.MAX_VALUE;
+                float mindist = u.getMaxRange()*u.getMaxRange();
                 Enemy best = null;
                 for (Enemy e : enemies) {
                     float dist = zkai.dist(e.unit.getPos(), u.getPos());
-                    if (dist < mindist && e.value > 500) {
+                    if (dist < mindist && e.value > 4000) {
                         mindist = dist;
+                        best = e;
                     }
                 }
                 if (best != null) {
                     u.attack(u, (short) 0, 500);
+                    
+                parent.debug("attacking maxunit");
                 } else {
-                    Area trg = Area.getArea(u.getPos()).farthestOfOwner(Owner.enemy, u.getPos(), u.getMaxRange());
-                    u.attackArea(trg.getCoords(), trg.getRadius(), (short) 0, parent.frame + 2000);
+                    if (maxcoords != null && maxcoords.x > 0 &&zkai.dist(maxcoords, u.getPos()) < u.getMaxRange()*u.getMaxRange()){
+                        
+                        u.attackArea(maxcoords, 100, (short) 0, parent.frame + 2000);
+                        parent.debug("attacking maxcoords");
+                    }else{
+                        parent.debug("maxcoords too far away/invalid");
+                        Area trg = Area.getArea(u.getPos()).farthestOfOwner(Owner.enemy, u.getPos(), u.getMaxRange());
+                        if (trg != null) {
+                            u.attackArea(trg.getCoords(), trg.getRadius(), (short) 0, parent.frame + 2000);
+                        }else{
+                            u.stop((short)0, parent.frame+100);
+                        }
+                    }
                 }
             }
         }
         if ((parent.frame % 16 == 8 || parent.frame < 5000) && parent.builder.factories.size() > 0 && Area.getArea(parent.builder.factories.get(0).getPos()).fighters.size() + waiting.size() >= groupsize) {
 
             //create new attack squad
+            squadSent = true;
             Area area = Area.getArea(parent.builder.factories.get(0).getPos());
             attackers.add(area.fighters);
             area.fighters.fighters.addAll(waiting.fighters);
@@ -817,6 +841,16 @@ public class ThreatHandler {
                             }
                         }
                         if (!found) {
+                            List<Fighter> zeus = new ArrayList();
+                            for (Fighter f : q.fighters){
+                                if (f.kind == Kind.assault){
+                                    zeus.add(f);
+                                    if (parent.builder.factories.size() > 0) f.unit.fight(parent.builder.factories.get(0).getPos(), (short)0, parent.frame+400);
+                                }
+                            }
+                            q.fighters.removeAll(zeus);
+                            waiting.fighters.addAll(zeus);
+                            if (parent.builder.factories.size() > 0 ) waiting.fight(parent.builder.factories.get(0).getPos());
                             area.fighters.fighters.addAll(q.fighters);
                             q.clear();
                         }
@@ -838,6 +872,14 @@ public class ThreatHandler {
 
         public float getValue() {
             float ret = 0;
+            
+            List<Fighter> useless = new ArrayList();
+            for (Fighter f : fighters) {
+                if (f.unit == null ||f.unit.getDef() == null ){
+                    useless.add(f);
+                }
+            }
+            fighters.removeAll(useless);
             for (Fighter f : fighters) {
                 ret += f.unit.getDef().getCost(BuilderHandler.metal);
             }
@@ -956,6 +998,7 @@ class ThreatPanel extends JPanel {
         float min = Float.MAX_VALUE;
         float max = Float.MIN_VALUE;
 
+        AIFloat3 maxcoords = null;
         for (int x = 0; x < getWidth(); x++) {
             for (int y = 0; y < getHeight(); y++) {
                 AIFloat3 pos = new AIFloat3(8 * x / (float) getWidth() * callback.getMap().getWidth(), -1f, 8 * y / (float) getHeight() * callback.getMap().getHeight());
@@ -964,6 +1007,7 @@ class ThreatPanel extends JPanel {
                 //        (x == getWidth()-1 && y == getHeight()-1 ))callback.getMap().getDrawer().addPoint(pos,"dangerCheck: " + val[x][y]);
                 if (val[x][y] > max) {
                     max = val[x][y];
+                    maxcoords = pos;
                 }
                 if (val[x][y] < min) {
                     min = val[x][y];
@@ -972,6 +1016,7 @@ class ThreatPanel extends JPanel {
         }
         //threatmap.parent.debug("ThreatPanel painted. min = " + min + " max = " + max);
         threatmap.maxval = max;
+        threatmap.maxcoords = maxcoords;
         max -= min;
         BufferedImage img = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_3BYTE_BGR);
         for (int x = 0; x < getWidth(); x++) {

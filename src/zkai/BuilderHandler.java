@@ -254,13 +254,13 @@ public class BuilderHandler {
     int bertha = 0;
 
     public UnitDef getDefenseTower(AIFloat3 pos) {
-        if (parent.defense.getDefense(pos) * antiAirMult > 200 && parent.rnd.nextInt(3)== 0) {
+        if (parent.defense.getDefense(pos) * antiAirMult > 200 && parent.rnd.nextInt(3) == 0) {
             return parent.razor;
         }
-        if (parent.defense.getDefense(pos) * antiAirMult > 100 && parent.defense.getDefense(pos) < 300 ) {
+        if (parent.defense.getDefense(pos) * antiAirMult > 100 && parent.defense.getDefense(pos) < 300) {
             return parent.razor;
         }
-        if (parent.defense.getDefense(pos) > 300 ) {
+        if (parent.defense.getDefense(pos) > 300) {
             return parent.hlt;
         }
         if (parent.defense.getValue(pos) / parent.defense.maxVal > 0.42 || parent.defense.getDefense(pos) > 200) {
@@ -389,9 +389,9 @@ public class BuilderHandler {
         energyUnderConstruction = Math.max(energyUnderConstruction, 0);
         reserveEnergy *= 1.00008;
         if (parent.frame % 37000 == 0 && Area.getAllied().size() > 0.2 * Area.areas.size()) {
-          
+
             antinukes++;
-        }  
+        }
         if (parent.frame % 30000 == 0 && Area.getAllied().size() > 0.2 * Area.areas.size()) {
             bertha++;
         } else if (parent.frame % 15000 == 0 && Area.getAllied().size() > 0.7 * Area.areas.size()) {
@@ -627,9 +627,11 @@ public class BuilderHandler {
             return pos;
         }
         pos = parent.callback.getMap().findClosestBuildSite(unit, pos, 800, 6, 0);
-        while (zkai.dist(pos, parent.closestMetalSpot(pos)) < 70 * 70) {
-            pos.x += parent.rnd.nextInt(40) - 20;
-            pos.z += parent.rnd.nextInt(40) - 20;
+        int mult = 1;
+        if (unit.equals(parent.cloaky)) mult = 4;
+        while (zkai.dist(pos, parent.closestMetalSpot(pos)) < 70 * 70 * mult) {
+            pos.x +=( parent.rnd.nextInt(40) - 20)*mult;
+            pos.z += (parent.rnd.nextInt(40) - 20)*mult;
             pos = parent.callback.getMap().findClosestBuildSite(unit, pos, 800, 6, 0);
         }
         return pos;
@@ -758,7 +760,7 @@ public class BuilderHandler {
                                 continue;
                             }
                             float val = parent.threats.getDanger(a.getCoords()) * parent.rnd.nextFloat();
-                            if (val > best && a.isBorder() && parent.defense.getDefense(a.getCoords())*3 < Math.sqrt(a.danger) + parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
+                            if (val > best && a.isBorder() && parent.defense.getDefense(a.getCoords()) * 3 < Math.sqrt(a.danger) + parent.threats.getValue(a.getCoords(), 5 * a.getRadius())) {
                                 best = val;
                                 besta = a;
                             }
@@ -777,7 +779,7 @@ public class BuilderHandler {
                         ebuilders++;
                     }
                 }
-                if (action == null && (!(parent.frame < 5000) || ebuilders == 0) && parent.frame > 500
+                if (action == null && (!(parent.frame < 5000) || ebuilders * 5 < builders.size()) && parent.frame > 500
                         && ((parent.callback.getEconomy().getIncome(energy) + energyUnderConstruction < parent.callback.getEconomy().getUsage(energy)
                         + reserveEnergy && parent.callback.getEconomy().getCurrent(energy) < 100) || parent.callback.getEconomy().getIncome(energy) < reserveEnergy)) {
                     float best = Float.MAX_VALUE;
@@ -921,7 +923,7 @@ public class BuilderHandler {
                                         continue;
                                     }
                                     if (b.action != null && b.action.getAction() == Actions.buildEnergy && b.action.getArea() == action.getArea()
-                                            &&b.order != null &&b.order.id < 0) {
+                                            && b.order != null && b.order.id < 0) {
                                         assist = b;
                                     }
                                 }
@@ -932,7 +934,7 @@ public class BuilderHandler {
                                     guard(assist.unit, 300 * (int) ((BuildEnergy) assist.action).amount, lastOrderId++);
                                 } else if (rep == null) {
                                     UnitDef def;
-                                    if (parent.callback.getEconomy().getIncome(energy) > 100) {
+                                    if (parent.callback.getEconomy().getIncome(energy) > 100 && parent.rnd.nextInt(7) == 0) {
                                         def = parent.fusion;
                                         ((BuildEnergy) action).amount -= 35;
                                     } else {
@@ -948,7 +950,7 @@ public class BuilderHandler {
                         case porc:
                             parent.label(unit.getPos(), "porc");
                             parent.debug("porcing" + zkai.DEFENSES);
-                            if (parent.defense.getDefense(action.area.getCoords())*3 >= Math.sqrt(action.area.danger) + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
+                            if (parent.defense.getDefense(action.area.getCoords()) * 3 >= Math.sqrt(action.area.danger) + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())) {
                                 parent.debug(parent.defense.getDefense(action.area.getCoords()) * 3 + " > " + (action.area.danger / 2 + parent.threats.getValue(action.area.getCoords(), 5 * action.area.getRadius())));
                                 action = null;
 
@@ -993,17 +995,27 @@ public class BuilderHandler {
                                 action = null;
                                 break;
                             }
-                            Builder assist = null;
-                            for (Builder b : builders) {
-                                if (b.action != null && b.action.getAction() == Actions.bertha && ((Bertha) b.action).index == bb.index
-                                        && b.order != null && b.order.id < 0) {
-                                    assist = b;
+                            if (zkai.dist3d(unit.getPos(), action.area.getDefensePos(parent.bertha)) > 120 * 120) {
+                                if (zkai.dist3d(unit.getPos(), action.area.getDefensePos(parent.bertha)) > 500 * 500){
+                                    move(parent.threats.randomize(action.area.getDefensePos(parent.bertha),300), parent.frame + 200, lastOrderId++);
+                                }else{
+                                    
+                                    move(action.area.getDefensePos(parent.bertha), parent.frame + 200, lastOrderId++);
                                 }
-                            }
-                            if (assist != null) {
-                                guard(assist.unit, parent.frame + 500, lastOrderId++);
                             } else {
-                                build(new Build(action.area.getDefensePos(parent.bertha), parent.bertha, parent.frame + 2000, lastOrderId++));
+
+                                Builder assist = null;
+                                for (Builder b : builders) {
+                                    if (b.action != null && b.action.getAction() == Actions.bertha && ((Bertha) b.action).index == bb.index
+                                            && b.order != null && b.order.id < 0) {
+                                        assist = b;
+                                    }
+                                }
+                                if (assist != null) {
+                                    guard(assist.unit, parent.frame + 500, lastOrderId++);
+                                } else {
+                                    build(new Build(action.area.getDefensePos(parent.bertha), parent.bertha, parent.frame + 2000, lastOrderId++));
+                                }
                             }
                             break;
                         case antinuke:
@@ -1064,7 +1076,7 @@ public class BuilderHandler {
                     grid.remove(findNode((Build) order));
                 }
                 if (parent.callback.getFriendlyUnitsIn(unit.getPos(), 500).size() > 4) {
-                    if (parent.rnd.nextBoolean() || zkai.dist(unit.getPos(), factories.get(0).getPos()) < 300) {
+                    if (parent.rnd.nextBoolean() || (factories.size() > 0 && zkai.dist(unit.getPos(), factories.get(0).getPos()) < 300)) {
                         //build(findClosestBuildPos(unit.getPos(), getDefenseTower(unit.getPos())), getDefenseTower(unit.getPos()), frame + 500, lastOrderId++);
 
                         AIFloat3 pos = new AIFloat3(unit.getPos());
@@ -1398,6 +1410,7 @@ public class BuilderHandler {
     class Antinuke extends Action {
 
         int index;
+
         public Antinuke(Area a, int index) {
             area = a;
             this.index = index;
